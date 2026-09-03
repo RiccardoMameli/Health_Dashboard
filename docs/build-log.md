@@ -6,6 +6,41 @@ of each working session.
 
 ---
 
+## 3 September 2026 — UI design language locked
+
+**No application code changed. Documentation and one static reference file.**
+
+Settled the visual direction before Phase 2 starts, so the brief renderer and
+the Expo app are built against a decided language rather than an improvised one.
+
+- **Plan §10.3 — "Glacier"** added: colour tokens for both themes, the three
+  type roles, materials and grid, component specs (readiness gauge, brief,
+  metric tile, micro-charts, gaps, chips, phase pill), motion and accessibility.
+- **`docs/ui/glacier-today.html`** — the reference implementation. The Today
+  screen from §10.1, in both themes, rendered from the §9.1 example payload
+  (readiness 62 amber with reduced confidence, sleep 342 min against a 430
+  baseline, RHR 58 vs 52, ACWR 1.27, weight EWMA 84.2). Static HTML, no build
+  step. Also published as an artifact:
+  <https://claude.ai/code/artifact/6cd4ddae-46e7-4fe4-b70a-f7f37dd87b95>
+
+### The decision that matters
+
+Four of the invariants are now enforced by the visual system rather than left
+to the copy: a missing night is a hatched dashed column and an unavailable
+metric is an em-dash with its reason; the phase pill is permanent chrome; status
+colour is separated from the accent and always carries its word; every figure is
+tappable to its definition. `insufficient_data` has a designed appearance — the
+empty dashed arc — which is what stops a placeholder score ever being invented
+for it.
+
+### Not yet designed
+
+The other six screens (Trends, Training, Body, Supplements, Experiments, Data
+health) inherit the tokens but have no composition. The phone layout is
+specified as an ordering, not drawn. Both are Phase 3 work.
+
+---
+
 ## 3 September 2026 — Phase 0 + Phase 1 backend
 
 **Status: both phase gates met, with one caveat (below).**

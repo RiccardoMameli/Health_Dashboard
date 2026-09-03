@@ -1,0 +1,767 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Glacier — reference implementation of the design language in
+     docs/health-dashboard-plan.md §10.3. The Today screen, both themes,
+     rendered from the §9.1 example brief payload. Static: no build step,
+     no dependencies beyond the three Google Fonts. Open it in a browser. -->
+<title>Glacier Today Screen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+
+<style>
+/* ─────────────────────────────────────────────────────────────
+   GLACIER — design tokens.  Dark-first: the bare :root block is
+   the dark palette; light is redefined for both the un-stamped
+   prefers-color-scheme case and the explicit [data-theme] stamp.
+   ───────────────────────────────────────────────────────────── */
+:root{
+  color-scheme: dark;
+  --bg:#080B10;
+  --veil-1: rgba(95,208,230,.13);
+  --veil-2: rgba(126,140,255,.09);
+  --surface: rgba(255,255,255,.045);
+  --surface-2: rgba(255,255,255,.075);
+  --hairline: rgba(255,255,255,.10);
+  --hairline-2: rgba(255,255,255,.20);
+  --ink:#EAF0F6;
+  --ink-2:#9BA9B8;
+  --ink-3:#68747F;
+  --accent:#5FD0E6;
+  --accent-soft: rgba(95,208,230,.16);
+  --good:#7CC46A;
+  --warn:#E9A94A;
+  --crit:#EE6C63;
+  --on-accent:#04161C;
+  --shadow: 0 20px 50px rgba(0,0,0,.45);
+  --glass-blur: saturate(150%) blur(20px);
+
+  --r-sm:10px; --r-md:16px; --r-lg:22px;
+  --f-display:"Sora","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --f-body:"Manrope","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    color-scheme: light;
+    --bg:#EEF1F5;
+    --veil-1: rgba(14,140,168,.12);
+    --veil-2: rgba(112,132,236,.10);
+    --surface: rgba(255,255,255,.74);
+    --surface-2: rgba(255,255,255,.94);
+    --hairline: rgba(12,22,32,.11);
+    --hairline-2: rgba(12,22,32,.22);
+    --ink:#0D141B;
+    --ink-2:#4B5866;
+    --ink-3:#7B8794;
+    --accent:#0E8CA8;
+    --accent-soft: rgba(14,140,168,.13);
+    --on-accent:#FFFFFF;
+    --good:#3F8F3A;
+    --warn:#9E6B14;
+    --crit:#C24A40;
+    --shadow: 0 18px 42px rgba(16,28,40,.10);
+  }
+}
+:root[data-theme="light"]{
+  color-scheme: light;
+  --bg:#EEF1F5;
+  --veil-1: rgba(14,140,168,.12);
+  --veil-2: rgba(112,132,236,.10);
+  --surface: rgba(255,255,255,.74);
+  --surface-2: rgba(255,255,255,.94);
+  --hairline: rgba(12,22,32,.11);
+  --hairline-2: rgba(12,22,32,.22);
+  --ink:#0D141B;
+  --ink-2:#4B5866;
+  --ink-3:#7B8794;
+  --accent:#0E8CA8;
+  --accent-soft: rgba(14,140,168,.13);
+  --on-accent:#FFFFFF;
+  --good:#3F8F3A;
+  --warn:#9E6B14;
+  --crit:#C24A40;
+  --shadow: 0 18px 42px rgba(16,28,40,.10);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:
+    radial-gradient(1100px 620px at 12% -8%, var(--veil-1), transparent 62%),
+    radial-gradient(900px 560px at 92% 4%, var(--veil-2), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+  color:var(--ink);
+  font-family:var(--f-body);
+  font-size:15px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+:focus-visible{outline:2px solid var(--accent); outline-offset:3px; border-radius:6px}
+
+.shell{max-width:1180px; margin:0 auto; padding:22px 20px 64px}
+
+/* ── micro-label: the instrument voice ── */
+.micro{
+  font-family:var(--f-mono); font-size:10px; font-weight:500;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3);
+}
+.num{font-family:var(--f-display); font-variant-numeric:tabular-nums; letter-spacing:-.02em}
+
+/* ── top bar ── */
+.topbar{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  padding:4px 2px 20px;
+}
+.mark{display:flex; align-items:baseline; gap:10px; margin-right:auto}
+.mark b{font-family:var(--f-display); font-weight:600; font-size:16px; letter-spacing:.02em}
+.mark span{color:var(--ink-2); font-size:13px}
+.pill{
+  display:inline-flex; align-items:center; gap:7px;
+  padding:6px 11px; border-radius:999px;
+  border:1px solid var(--hairline); background:var(--surface);
+  backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+  font-family:var(--f-mono); font-size:10px; font-weight:500;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--ink-2);
+  white-space:nowrap;
+}
+.pill .dot{width:6px; height:6px; border-radius:50%; background:var(--accent)}
+.pill.phase .dot{background:var(--ink-3)}
+button.pill{cursor:pointer; font:inherit; font-family:var(--f-mono); font-size:10px;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--ink-2)}
+button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
+
+/* ── bento ── */
+.bento{display:grid; grid-template-columns:repeat(12,1fr); gap:14px}
+.card{
+  position:relative;
+  border:1px solid var(--hairline);
+  background:var(--surface);
+  backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+  border-radius:var(--r-lg);
+  padding:20px;
+  box-shadow:var(--shadow);
+}
+.card > .micro:first-child{display:block; margin-bottom:14px}
+.span-5{grid-column:span 5} .span-7{grid-column:span 7}
+.span-3{grid-column:span 3} .span-4{grid-column:span 4}
+.span-6{grid-column:span 6} .span-8{grid-column:span 8}
+.span-12{grid-column:span 12}
+@media (max-width:1000px){
+  .span-5,.span-7,.span-4,.span-6,.span-8{grid-column:span 12}
+  .span-3{grid-column:span 6}
+}
+@media (max-width:560px){ .span-3{grid-column:span 12} .shell{padding:18px 14px 48px} }
+
+/* ── readiness hero ── */
+.hero{display:flex; flex-direction:column; gap:18px}
+.gaugewrap{display:flex; align-items:center; gap:22px; flex-wrap:wrap}
+.gauge{position:relative; width:186px; height:186px; flex:none}
+.gauge svg{display:block; width:100%; height:100%}
+.gauge .center{
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:2px;
+}
+.gauge .score{font-family:var(--f-display); font-weight:600; font-size:60px;
+  line-height:1; letter-spacing:-.04em; font-variant-numeric:tabular-nums; color:var(--ink)}
+.gauge .of{font-family:var(--f-mono); font-size:10px; letter-spacing:.14em; color:var(--ink-3)}
+.status-line{display:flex; align-items:center; gap:8px; margin-bottom:6px}
+.status-glyph{
+  width:18px; height:18px; border-radius:5px; flex:none;
+  display:grid; place-items:center; font-size:11px; font-weight:700;
+  font-family:var(--f-mono); color:var(--bg);
+}
+.st-amber .status-glyph{background:var(--warn)}
+.st-amber .status-name{color:var(--warn)}
+.status-name{font-family:var(--f-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase}
+.hero .lede{font-size:14px; color:var(--ink-2); margin:0; max-width:34ch}
+
+.contribs{display:flex; flex-direction:column; gap:11px; border-top:1px solid var(--hairline); padding-top:16px; margin-top:auto}
+.contrib{display:grid; grid-template-columns:1fr auto; gap:4px 12px; align-items:baseline}
+.contrib .name{font-size:13.5px; color:var(--ink)}
+.contrib .impact{font-family:var(--f-mono); font-size:13px; font-weight:500; color:var(--crit); font-variant-numeric:tabular-nums}
+.contrib .track{grid-column:1 / -1; height:4px; border-radius:2px; background:var(--surface-2); overflow:hidden}
+.contrib .fill{height:100%; border-radius:2px; background:var(--crit); opacity:.85}
+.defn{
+  margin-top:2px; font-size:12px; color:var(--ink-3);
+  display:flex; align-items:center; gap:6px;
+}
+
+/* ── brief ── */
+.brief h2{
+  font-family:var(--f-display); font-weight:600; font-size:22px; line-height:1.3;
+  letter-spacing:-.015em; margin:0 0 16px; text-wrap:balance; max-width:30ch;
+}
+.why{list-style:none; margin:0 0 4px; padding:0; display:flex; flex-direction:column; gap:14px}
+.why li{display:grid; grid-template-columns:auto 1fr; gap:0 12px}
+.why .rule{width:2px; border-radius:1px; background:var(--hairline-2); grid-row:1 / span 2}
+.why p{margin:0; font-size:14px}
+.why .ev{margin-top:3px; font-size:12.5px; color:var(--ink-2); font-family:var(--f-mono); letter-spacing:.01em}
+.conf{
+  display:inline-block; margin-left:8px; padding:1px 6px; border-radius:5px;
+  border:1px solid var(--hairline); font-family:var(--f-mono); font-size:9.5px;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); vertical-align:1px;
+}
+.actions{display:flex; flex-direction:column; gap:9px; margin-top:18px; padding-top:16px; border-top:1px solid var(--hairline)}
+.action{display:flex; gap:11px; align-items:flex-start; font-size:14px}
+.action .idx{
+  font-family:var(--f-mono); font-size:10px; color:var(--accent);
+  border:1px solid var(--accent-soft); background:var(--accent-soft);
+  border-radius:6px; padding:2px 6px; flex:none; margin-top:1px;
+}
+.action .rat{color:var(--ink-2); font-size:12.5px; display:block}
+.verdict{
+  margin-top:16px; padding:12px 14px; border-radius:var(--r-md);
+  border:1px solid var(--hairline); background:var(--surface-2);
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+}
+.verdict .v{font-family:var(--f-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink)}
+.verdict .r{font-size:13px; color:var(--ink-2)}
+.caveat{
+  margin-top:14px; display:flex; gap:9px; align-items:flex-start;
+  font-size:12.5px; color:var(--ink-2);
+}
+.caveat .bar{width:2px; align-self:stretch; background:var(--warn); border-radius:1px; opacity:.7}
+.feedback{display:flex; gap:8px; margin-top:16px; align-items:center}
+.fb{
+  font-family:var(--f-mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+  padding:7px 12px; border-radius:999px; border:1px solid var(--hairline);
+  background:transparent; color:var(--ink-2); cursor:pointer;
+}
+.fb:hover{border-color:var(--hairline-2); color:var(--ink)}
+.fb[aria-pressed="true"]{background:var(--accent-soft); border-color:var(--accent); color:var(--accent)}
+
+/* ── metric tiles ── */
+.tile{display:flex; flex-direction:column; gap:12px; min-height:184px}
+.tile .head{display:flex; align-items:baseline; justify-content:space-between; gap:10px}
+.tile .val{font-family:var(--f-display); font-weight:600; font-size:30px; letter-spacing:-.03em; font-variant-numeric:tabular-nums; line-height:1}
+.tile .val small{font-family:var(--f-body); font-size:13px; font-weight:500; color:var(--ink-2); letter-spacing:0; margin-left:3px}
+.delta{font-family:var(--f-mono); font-size:11.5px; font-variant-numeric:tabular-nums}
+.delta.down{color:var(--crit)} .delta.up{color:var(--crit)} .delta.flat{color:var(--ink-2)} .delta.ok{color:var(--good)}
+.foot{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:auto}
+.src{display:inline-flex; align-items:center; gap:6px; font-family:var(--f-mono); font-size:9.5px;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3)}
+.src i{width:5px; height:5px; border-radius:50%; display:block}
+.s-samsung i{background:#5B93D6} .s-hevy i{background:#D9803F} .s-withings i{background:#4FB3C4} .s-mfp i{background:#8AA83F}
+
+/* sleep bars */
+.bars{position:relative; height:78px; display:flex; align-items:flex-end; gap:6px}
+.bars .baseline{
+  position:absolute; left:0; right:0; border-top:1px dashed var(--hairline-2);
+  pointer-events:none;
+}
+.bars .baseline span{position:absolute; right:0; top:-15px; font-family:var(--f-mono); font-size:9px; color:var(--ink-3)}
+.bar{flex:1; border-radius:4px 4px 0 0; background:var(--accent); opacity:.42; cursor:default; transition:opacity .15s}
+.bar:hover{opacity:.75}
+.bar.last{opacity:1}
+.bar.missing{
+  background:repeating-linear-gradient(135deg, var(--hairline) 0 2px, transparent 2px 7px);
+  border:1px dashed var(--hairline-2); border-bottom:none;
+  border-radius:4px 4px 0 0; opacity:1;
+}
+/* sparkline */
+.spark{width:100%; height:78px; display:block; overflow:visible}
+/* acwr track */
+.acwr{position:relative; height:26px; margin-top:4px}
+.acwr .rail{position:absolute; left:0; right:0; top:9px; height:5px; border-radius:3px; background:var(--surface-2); border:1px solid var(--hairline)}
+.acwr .zone{position:absolute; top:9px; height:5px; background:var(--accent-soft); border-radius:3px}
+.acwr .flag{position:absolute; top:2px; width:1px; height:19px; background:var(--warn)}
+.acwr .flag span{position:absolute; top:-14px; left:-11px; font-family:var(--f-mono); font-size:9px; color:var(--warn)}
+.acwr .knob{position:absolute; top:4px; width:15px; height:15px; margin-left:-7px; border-radius:50%;
+  background:var(--accent); border:3px solid var(--bg); box-shadow:0 0 0 1px var(--accent)}
+.acwr .ends{display:flex; justify-content:space-between; margin-top:18px}
+
+/* ── check-in ── */
+.checkin{display:flex; flex-direction:column; gap:14px}
+.sliders{display:flex; flex-direction:column; gap:10px}
+.slider{display:grid; grid-template-columns:74px 1fr; align-items:center; gap:12px}
+.slider .lbl{font-size:12.5px; color:var(--ink-2)}
+.pips{display:flex; gap:5px}
+.pip{flex:1; height:6px; border-radius:3px; background:var(--surface-2); border:1px solid var(--hairline)}
+.pip.on{background:var(--accent); border-color:transparent; opacity:.8}
+.tags{display:flex; flex-wrap:wrap; gap:6px}
+.tag{
+  font-family:var(--f-body); font-size:12px; padding:5px 10px; border-radius:999px;
+  border:1px solid var(--hairline); background:transparent; color:var(--ink-2); cursor:pointer;
+}
+.tag:hover{border-color:var(--hairline-2); color:var(--ink)}
+.tag[aria-pressed="true"]{background:var(--accent-soft); border-color:var(--accent); color:var(--accent)}
+.cta{
+  display:flex; align-items:center; justify-content:center; gap:9px;
+  padding:13px 18px; border-radius:var(--r-md); cursor:pointer;
+  background:var(--accent); border:none; color:var(--on-accent);
+  font-family:var(--f-body); font-weight:700; font-size:14.5px; letter-spacing:.01em;
+}
+.cta:hover{filter:brightness(1.08)}
+
+/* ── supplements ── */
+.stack{display:flex; flex-direction:column; gap:2px}
+.supp{
+  display:flex; align-items:center; gap:12px; padding:9px 2px;
+  border-bottom:1px solid var(--hairline); cursor:pointer; background:none;
+  border-left:none; border-right:none; border-top:none; width:100%; text-align:left;
+  font-family:var(--f-body); color:var(--ink); font-size:14px;
+}
+.supp:last-child{border-bottom:none}
+.box{
+  width:19px; height:19px; border-radius:6px; flex:none;
+  border:1.5px solid var(--hairline-2); display:grid; place-items:center;
+  color:transparent; font-size:11px; transition:.15s;
+}
+.supp[aria-pressed="true"] .box{background:var(--accent); border-color:var(--accent); color:var(--on-accent)}
+.supp[aria-pressed="true"] .nm{color:var(--ink-2); text-decoration:line-through; text-decoration-color:var(--ink-3)}
+.supp .nm{flex:1}
+.supp .dose{font-family:var(--f-mono); font-size:11px; color:var(--ink-3); font-variant-numeric:tabular-nums}
+.sched{
+  font-family:var(--f-mono); font-size:9px; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--ink-3); border:1px solid var(--hairline); border-radius:5px; padding:2px 5px;
+}
+
+/* ── unavailable / data health ── */
+.gaps{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+@media (max-width:700px){ .gaps{grid-template-columns:1fr} }
+.gap{
+  border:1px dashed var(--hairline-2); border-radius:var(--r-md);
+  padding:14px 16px; display:flex; flex-direction:column; gap:5px;
+}
+.gap .em{font-family:var(--f-display); font-size:28px; font-weight:500; color:var(--ink-3); line-height:1}
+.gap .note{font-size:12.5px; color:var(--ink-2)}
+.sync{display:flex; flex-wrap:wrap; gap:8px 18px; margin-top:16px; padding-top:14px; border-top:1px solid var(--hairline)}
+.sync .row{display:flex; align-items:center; gap:8px; font-family:var(--f-mono); font-size:10.5px; color:var(--ink-2)}
+.sync .row i{width:5px; height:5px; border-radius:50%; display:block}
+.sync .row b{color:var(--ink-3); font-weight:400}
+
+/* ── design language section ── */
+.spec{margin-top:44px; border-top:1px solid var(--hairline); padding-top:30px}
+.spec h3{font-family:var(--f-display); font-weight:600; font-size:19px; letter-spacing:-.01em; margin:0 0 6px}
+.spec > p{margin:0 0 24px; color:var(--ink-2); font-size:14px; max-width:62ch}
+.specgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:26px}
+.swatches{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:12px}
+.sw{width:100%}
+.sw .chip{height:38px; border-radius:9px; border:1px solid var(--hairline)}
+.sw .nm{font-family:var(--f-mono); font-size:9px; color:var(--ink-3); margin-top:5px; letter-spacing:.04em}
+.typerow{margin-top:12px; display:flex; flex-direction:column; gap:12px}
+.typerow div span{display:block; font-size:11px; color:var(--ink-3); font-family:var(--f-mono); letter-spacing:.08em; text-transform:uppercase}
+.rules{margin:12px 0 0; padding:0; list-style:none; display:flex; flex-direction:column; gap:12px}
+.rules li{font-size:13.5px; color:var(--ink-2); padding-left:14px; border-left:2px solid var(--accent-soft)}
+.rules b{color:var(--ink); font-weight:600}
+
+/* tooltip */
+#tip{
+  position:fixed; z-index:50; pointer-events:none; opacity:0; transition:opacity .12s;
+  background:var(--surface-2); border:1px solid var(--hairline-2); color:var(--ink);
+  backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+  border-radius:9px; padding:7px 10px; font-family:var(--f-mono); font-size:11px;
+  box-shadow:var(--shadow); white-space:nowrap;
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none !important; animation:none !important} }
+</style>
+</head>
+
+<body>
+<div class="shell">
+
+  <header class="topbar">
+    <div class="mark">
+      <b>Glacier</b>
+      <span>Thursday 4 September · 06:34</span>
+    </div>
+    <span class="pill phase"><i class="dot"></i>Baseline · day 12 of 42</span>
+    <span class="pill"><i class="dot"></i>87% complete</span>
+    <button class="pill" id="theme" type="button" aria-label="Switch colour theme">Theme</button>
+  </header>
+
+  <div class="bento">
+
+    <!-- ───────── readiness ───────── -->
+    <section class="card hero span-5" aria-labelledby="rd">
+      <span class="micro" id="rd">Readiness</span>
+
+      <div class="gaugewrap">
+        <div class="gauge">
+          <svg viewBox="0 0 186 186" role="img" aria-label="Readiness 62 out of 100, amber">
+            <circle cx="93" cy="93" r="76" fill="none" stroke="var(--surface-2)" stroke-width="13"
+                    stroke-linecap="round" stroke-dasharray="358.1 477.5"
+                    transform="rotate(-225 93 93)"></circle>
+            <circle id="arc" cx="93" cy="93" r="76" fill="none" stroke="var(--warn)" stroke-width="13"
+                    stroke-linecap="round" stroke-dasharray="222.0 477.5"
+                    transform="rotate(-225 93 93)"></circle>
+            <text x="27" y="171" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9">0</text>
+            <text x="150" y="171" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9">100</text>
+          </svg>
+          <div class="center">
+            <div class="score" id="score">62</div>
+            <div class="of">of 100</div>
+          </div>
+        </div>
+
+        <div class="st-amber">
+          <div class="status-line">
+            <span class="status-glyph" aria-hidden="true">!</span>
+            <span class="status-name">Amber</span>
+          </div>
+          <p class="lede">Confidence reduced — HRV is unavailable, so its weight was redistributed across sleep and resting heart rate.</p>
+        </div>
+      </div>
+
+      <div class="contribs">
+        <span class="micro">Top contributors</span>
+        <div class="contrib">
+          <span class="name">Sleep debt, 14 days</span>
+          <span class="impact">−18</span>
+          <span class="track"><span class="fill" style="width:72%"></span></span>
+        </div>
+        <div class="contrib">
+          <span class="name">Resting HR deviation</span>
+          <span class="impact">−9</span>
+          <span class="track"><span class="fill" style="width:36%"></span></span>
+        </div>
+        <p class="defn">Tap any number to see its definition and inputs.</p>
+      </div>
+    </section>
+
+    <!-- ───────── daily brief ───────── -->
+    <section class="card brief span-7" aria-labelledby="db">
+      <span class="micro" id="db">Daily brief · 06:30</span>
+
+      <h2>Sleep ran 88 minutes under baseline and resting heart rate is 6 bpm above it.</h2>
+
+      <ul class="why">
+        <li>
+          <span class="rule"></span>
+          <p>Last night was 5h42m against a 30-day median of 7h10m.<span class="conf">High</span></p>
+          <p class="ev">342 min · baseline 430 min · efficiency 81%</p>
+        </li>
+        <li>
+          <span class="rule"></span>
+          <p>Resting heart rate has been above baseline for three consecutive mornings.<span class="conf">Medium</span></p>
+          <p class="ev">58 bpm · baseline 52 bpm · Δ +6</p>
+        </li>
+        <li>
+          <span class="rule"></span>
+          <p>Training load is climbing, with four days since the last rest day.<span class="conf">Medium</span></p>
+          <p class="ev">ACWR 1.27 · acute 2,140 · chronic 1,680</p>
+        </li>
+      </ul>
+
+      <div class="actions">
+        <span class="micro">Do today</span>
+        <div class="action">
+          <span class="idx">1</span>
+          <span>Keep tonight's lights-out within 30 minutes of your usual time.
+            <span class="rat">Sleep midpoint variance is 74 minutes over the last fortnight.</span></span>
+        </div>
+        <div class="action">
+          <span class="idx">2</span>
+          <span>Log the check-in before 07:15.
+            <span class="rat">Yesterday's entry arrived late and was flagged.</span></span>
+        </div>
+      </div>
+
+      <div class="verdict">
+        <span class="v">Train light</span>
+        <span class="r">Sleep is short and resting HR is elevated. Keep the session submaximal, or move Pull B to tomorrow.</span>
+      </div>
+
+      <div class="caveat">
+        <span class="bar" aria-hidden="true"></span>
+        <span>Protein unavailable — MyFitnessPal does not sync macros. Nutrition is 45% complete for yesterday.</span>
+      </div>
+
+      <div class="feedback">
+        <span class="micro" style="margin-right:4px">Was this useful</span>
+        <button class="fb" type="button" aria-pressed="false">Yes</button>
+        <button class="fb" type="button" aria-pressed="false">No</button>
+      </div>
+    </section>
+
+    <!-- ───────── four tiles ───────── -->
+    <section class="card tile span-3" aria-labelledby="t1">
+      <div class="head">
+        <span class="micro" id="t1">Sleep</span>
+        <span class="delta down">−88 min</span>
+      </div>
+      <div class="val">5<small>h</small> 42<small>m</small></div>
+      <div class="bars" id="sleepbars">
+        <div class="baseline" style="bottom:89.6%"><span>baseline 7h10m</span></div>
+        <div class="bar" style="height:89.2%" data-tip="Fri 29 Aug · 7h08m"></div>
+        <div class="bar" style="height:83.5%" data-tip="Sat 30 Aug · 6h41m"></div>
+        <div class="bar missing" style="height:100%" data-tip="Sun 31 Aug · no data — watch not worn"></div>
+        <div class="bar" style="height:82.5%" data-tip="Mon 1 Sep · 6h36m"></div>
+        <div class="bar" style="height:93.1%" data-tip="Tue 2 Sep · 7h27m"></div>
+        <div class="bar" style="height:77.5%" data-tip="Wed 3 Sep · 6h12m"></div>
+        <div class="bar last" style="height:71.3%" data-tip="Thu 4 Sep · 5h42m"></div>
+      </div>
+      <div class="foot">
+        <span class="src s-samsung"><i></i>Samsung Health</span>
+        <span class="micro">7 nights</span>
+      </div>
+    </section>
+
+    <section class="card tile span-3" aria-labelledby="t2">
+      <div class="head">
+        <span class="micro" id="t2">Resting HR</span>
+        <span class="delta up">+6 bpm</span>
+      </div>
+      <div class="val">58<small>bpm</small></div>
+      <svg class="spark" viewBox="0 0 220 70" role="img"
+           aria-label="Resting heart rate over 7 days, rising from 51 to 58 bpm against a 50 to 54 baseline band">
+        <rect x="0" y="32" width="220" height="13.3" fill="var(--accent-soft)"></rect>
+        <line x1="0" y1="38.7" x2="220" y2="38.7" stroke="var(--hairline-2)" stroke-width="1" stroke-dasharray="3 4"></line>
+        <polyline points="10,42 43,35.3 76,38.7 109,32 142,35.3 175,25.3 208,18.7"
+                  fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>
+        <circle cx="208" cy="18.7" r="4.5" fill="var(--accent)" stroke="var(--bg)" stroke-width="2"></circle>
+        <text x="0" y="60" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9">51</text>
+        <text x="196" y="60" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9">58</text>
+      </svg>
+      <div class="foot">
+        <span class="src s-samsung"><i></i>Samsung Health</span>
+        <span class="micro">Median 52</span>
+      </div>
+    </section>
+
+    <section class="card tile span-3" aria-labelledby="t3">
+      <div class="head">
+        <span class="micro" id="t3">Yesterday</span>
+        <span class="delta flat">RPE 8</span>
+      </div>
+      <div class="val" style="font-size:22px">Push A</div>
+      <div>
+        <span class="micro" style="letter-spacing:.1em">Volume 9,840 kg</span>
+        <div class="acwr">
+          <div class="rail"></div>
+          <div class="zone" style="left:20%; width:46.7%"></div>
+          <div class="flag" style="left:66.7%"><span>1.5</span></div>
+          <div class="knob" style="left:51.3%"></div>
+        </div>
+        <div class="ends">
+          <span class="micro">ACWR 1.27</span>
+          <span class="micro">Spike above 1.5</span>
+        </div>
+      </div>
+      <div class="foot">
+        <span class="src s-hevy"><i></i>Hevy</span>
+        <span class="micro">4 days since rest</span>
+      </div>
+    </section>
+
+    <section class="card tile span-3" aria-labelledby="t4">
+      <div class="head">
+        <span class="micro" id="t4">Weight trend</span>
+        <span class="delta ok">−0.24 kg/wk</span>
+      </div>
+      <div class="val">84.2<small>kg</small></div>
+      <svg class="spark" viewBox="0 0 220 70" role="img"
+           aria-label="Smoothed weight over 30 days, falling from 85.0 to 84.2 kilograms">
+        <path d="M10,18 L28.2,20.3 L46.4,22 L64.5,24.7 L82.7,27 L100.9,28.7 L119.1,32 L137.3,34.7 L155.5,37 L173.6,40 L191.8,42.7 L210,45.3 L210,58 L10,58 Z"
+              fill="var(--accent-soft)"></path>
+        <polyline points="10,18 28.2,20.3 46.4,22 64.5,24.7 82.7,27 100.9,28.7 119.1,32 137.3,34.7 155.5,37 173.6,40 191.8,42.7 210,45.3"
+                  fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>
+        <circle cx="210" cy="45.3" r="4.5" fill="var(--accent)" stroke="var(--bg)" stroke-width="2"></circle>
+        <text x="0" y="12" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9">85.0</text>
+        <text x="186" y="66" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9">84.2</text>
+      </svg>
+      <div class="foot">
+        <span class="src s-withings"><i></i>Withings</span>
+        <span class="micro">EWMA · 30 d</span>
+      </div>
+    </section>
+
+    <!-- ───────── check-in ───────── -->
+    <section class="card checkin span-4" aria-labelledby="ci">
+      <span class="micro" id="ci">Check-in · not yet submitted</span>
+      <div class="sliders" aria-hidden="true">
+        <div class="slider"><span class="lbl">Energy</span>
+          <span class="pips"><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip"></i><i class="pip"></i></span></div>
+        <div class="slider"><span class="lbl">Sleep quality</span>
+          <span class="pips"><i class="pip on"></i><i class="pip on"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></div>
+        <div class="slider"><span class="lbl">Stress</span>
+          <span class="pips"><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip"></i></span></div>
+      </div>
+      <p style="margin:0; font-size:12.5px; color:var(--ink-2)">Pre-filled with yesterday's answers. Seven sliders, one headline, thirteen tags — one screen, no scrolling.</p>
+      <div>
+        <span class="micro" style="display:block; margin-bottom:9px">Tags · 13 available</span>
+        <div class="tags">
+          <button class="tag" type="button" aria-pressed="true">Late screen</button>
+          <button class="tag" type="button" aria-pressed="true">Work stress</button>
+          <button class="tag" type="button" aria-pressed="false">Alcohol</button>
+          <button class="tag" type="button" aria-pressed="false">Late meal</button>
+          <button class="tag" type="button" aria-pressed="false">No watch</button>
+          <button class="tag" type="button" aria-pressed="false">Travel</button>
+          <button class="tag" type="button" aria-pressed="false">Illness</button>
+        </div>
+      </div>
+      <button class="cta" type="button">Check in · about 25 seconds</button>
+      <div class="foot">
+        <span class="micro">Streak 11 days</span>
+        <span class="micro">30-day completion 87%</span>
+      </div>
+    </section>
+
+    <!-- ───────── supplements ───────── -->
+    <section class="card span-4" aria-labelledby="sp">
+      <span class="micro" id="sp">Supplements · 93% over 7 days</span>
+      <div class="stack">
+        <button class="supp" type="button" aria-pressed="true"><span class="box" aria-hidden="true">✓</span><span class="nm">Fish oil</span><span class="dose">4 softgels</span></button>
+        <button class="supp" type="button" aria-pressed="true"><span class="box" aria-hidden="true">✓</span><span class="nm">Multivitamin</span><span class="dose">2 tablets</span></button>
+        <button class="supp" type="button" aria-pressed="true"><span class="box" aria-hidden="true">✓</span><span class="nm">Vitamin D3</span><span class="dose">4,000 IU</span></button>
+        <button class="supp" type="button" aria-pressed="false"><span class="box" aria-hidden="true">✓</span><span class="nm">Vitamin C</span><span class="dose">1,000 mg</span></button>
+        <button class="supp" type="button" aria-pressed="false"><span class="box" aria-hidden="true">✓</span><span class="nm">Creatine</span><span class="dose">6 g</span></button>
+        <button class="supp" type="button" aria-pressed="false"><span class="box" aria-hidden="true">✓</span><span class="nm">Beta-alanine</span><span class="sched">Pre-workout</span></button>
+        <button class="supp" type="button" aria-pressed="false"><span class="box" aria-hidden="true">✓</span><span class="nm">Magnesium complex</span><span class="sched">Bedtime</span></button>
+      </div>
+      <p style="margin:12px 0 0; font-size:12.5px; color:var(--ink-2)">BCAA hidden — it is scheduled on workout days and none is logged yet.</p>
+    </section>
+
+    <!-- ───────── what the system cannot see ───────── -->
+    <section class="card span-4" aria-labelledby="dh">
+      <span class="micro" id="dh">Not measured</span>
+      <div class="gaps">
+        <div class="gap">
+          <span class="micro">HRV</span>
+          <span class="em">—</span>
+          <span class="note">Not exposed by this device. Readiness runs on the fallback formula.</span>
+        </div>
+        <div class="gap">
+          <span class="micro">Protein g/kg</span>
+          <span class="em">—</span>
+          <span class="note">MyFitnessPal does not sync macros. Open item O2.</span>
+        </div>
+      </div>
+      <div class="sync">
+        <span class="row"><i style="background:#5B93D6"></i>Samsung Health <b>06:10</b></span>
+        <span class="row"><i style="background:#D9803F"></i>Hevy <b>06:12</b></span>
+        <span class="row"><i style="background:#4FB3C4"></i>Withings <b>06:14</b></span>
+        <span class="row"><i style="background:#8AA83F"></i>MyFitnessPal <b>05:58</b></span>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ───────── design language ───────── -->
+  <section class="spec">
+    <h3>The language, in short</h3>
+    <p>Dark-first glass over a cool ground, Apple's spacing and restraint, an instrument-panel voice in the
+      monospaced micro-labels. Everything on this screen is drawn from the §9.1 brief contract in the plan —
+      real fields, real units, real gaps.</p>
+
+    <div class="specgrid">
+      <div>
+        <span class="micro">Palette</span>
+        <div class="swatches">
+          <div class="sw"><div class="chip" style="background:var(--bg)"></div><div class="nm">ground</div></div>
+          <div class="sw"><div class="chip" style="background:var(--surface-2)"></div><div class="nm">glass</div></div>
+          <div class="sw"><div class="chip" style="background:var(--accent)"></div><div class="nm">accent</div></div>
+          <div class="sw"><div class="chip" style="background:var(--good)"></div><div class="nm">green</div></div>
+          <div class="sw"><div class="chip" style="background:var(--warn)"></div><div class="nm">amber</div></div>
+          <div class="sw"><div class="chip" style="background:var(--crit)"></div><div class="nm">red</div></div>
+        </div>
+        <p style="font-size:12.5px; color:var(--ink-2); margin-top:12px">Glacier cyan is the interface: charts,
+          controls, anything you can touch. Green, amber and red are reserved for status and never used for
+          decoration — so an amber ring always means amber.</p>
+      </div>
+
+      <div>
+        <span class="micro">Type</span>
+        <div class="typerow">
+          <div><span>Sora — figures &amp; headlines</span>
+            <b class="num" style="font-family:var(--f-display); font-size:30px; font-weight:600">62 · 84.2 kg</b></div>
+          <div><span>Manrope — body</span>
+            <span style="font-size:15px">Sleep ran 88 minutes under baseline.</span></div>
+          <div><span>JetBrains Mono — labels &amp; evidence</span>
+            <span style="font-family:var(--f-mono); font-size:12px; letter-spacing:.02em">342 MIN · BASELINE 430 MIN</span></div>
+        </div>
+      </div>
+
+      <div>
+        <span class="micro">Four rules it enforces</span>
+        <ul class="rules">
+          <li><b>A gap is drawn as a gap.</b> The missing night is a dashed outline and the unavailable metrics
+            are em-dashes, never a zero and never a smoothed line.</li>
+          <li><b>The phase is always on screen.</b> The pill says baseline, so the brief states deviations and
+            claims no causes.</li>
+          <li><b>Status colour is not the accent.</b> Green, amber and red mean one thing each, and always carry
+            a word beside them.</li>
+          <li><b>No number is a black box.</b> Every figure opens its definition, its inputs and its source.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="tip" role="status"></div>
+
+<script>
+(function(){
+  var root = document.documentElement;
+  var store = {
+    get: function(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
+    set: function(k,v){ try { localStorage.setItem(k,v); } catch(e){} }
+  };
+  var saved = store.get('glacier-theme');
+  if (saved === 'light' || saved === 'dark') root.setAttribute('data-theme', saved);
+
+  document.getElementById('theme').addEventListener('click', function(){
+    var isDark = root.getAttribute('data-theme')
+      ? root.getAttribute('data-theme') === 'dark'
+      : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var next = isDark ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    store.set('glacier-theme', next);
+  });
+
+  // toggles
+  Array.prototype.forEach.call(document.querySelectorAll('.supp, .fb, .tag'), function(b){
+    b.addEventListener('click', function(){
+      var on = b.getAttribute('aria-pressed') === 'true';
+      if (b.className === 'fb'){
+        Array.prototype.forEach.call(b.parentNode.querySelectorAll('.fb'), function(o){
+          o.setAttribute('aria-pressed','false');
+        });
+      }
+      b.setAttribute('aria-pressed', on ? 'false' : 'true');
+    });
+  });
+
+  // tooltip on the sleep bars
+  var tip = document.getElementById('tip');
+  Array.prototype.forEach.call(document.querySelectorAll('[data-tip]'), function(el){
+    function show(e){
+      tip.textContent = el.getAttribute('data-tip');
+      tip.style.opacity = '1';
+      var r = el.getBoundingClientRect();
+      var x = Math.min(window.innerWidth - tip.offsetWidth - 10, Math.max(8, r.left + r.width/2 - tip.offsetWidth/2));
+      tip.style.left = x + 'px';
+      tip.style.top = Math.max(8, r.top - tip.offsetHeight - 8) + 'px';
+    }
+    el.addEventListener('mouseenter', show);
+    el.addEventListener('mousemove', show);
+    el.addEventListener('mouseleave', function(){ tip.style.opacity = '0'; });
+  });
+
+  // readiness roll-up
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!reduce){
+    var el = document.getElementById('score'), arc = document.getElementById('arc');
+    var target = 62, t0 = null;
+    arc.style.transition = 'stroke-dasharray 1.1s cubic-bezier(.22,.8,.3,1)';
+    arc.setAttribute('stroke-dasharray', '0 477.5');
+    requestAnimationFrame(function(){ arc.setAttribute('stroke-dasharray', '222.0 477.5'); });
+    function step(t){
+      if (t0 === null) t0 = t;
+      var p = Math.min(1, (t - t0) / 1100);
+      var e = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(target * e);
+      if (p < 1) requestAnimationFrame(step);
+    }
+    el.textContent = '0';
+    requestAnimationFrame(step);
+  }
+})();
+</script>
+</body>
+</html>
