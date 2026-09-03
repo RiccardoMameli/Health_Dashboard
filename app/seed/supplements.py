@@ -1,0 +1,65 @@
+"""Ricky's current stack (plan 8.1), seeded as the starting protocol."""
+
+STACK = [
+    {
+        "name": "Fish oil",
+        "dose_amount": 4,
+        "dose_unit": "softgels",
+        "form": "softgel",
+        "schedule": "daily",
+    },
+    {
+        "name": "Multivitamin",
+        "dose_amount": 2,
+        "dose_unit": "tablets",
+        "form": "tablet",
+        "schedule": "daily",
+    },
+    {
+        "name": "Vitamin C",
+        "dose_amount": 1000,
+        "dose_unit": "mg",
+        "form": "tablet",
+        "schedule": "daily",
+    },
+    {
+        "name": "Vitamin D3",
+        "dose_amount": 4000,
+        "dose_unit": "IU",
+        "form": "softgel",
+        "schedule": "daily",
+        "notes": "100 micrograms",
+    },
+    {
+        "name": "Creatine",
+        "dose_amount": 6,
+        "dose_unit": "g",
+        "form": "powder",
+        "schedule": "daily",
+        "notes": "2 scoops",
+    },
+    {
+        "name": "Magnesium complex",
+        "dose_amount": 420,
+        "dose_unit": "mg elemental",
+        "form": "capsule",
+        "schedule": "bedtime",
+        "notes": "2 capsules",
+    },
+    {
+        "name": "BCAA",
+        "dose_amount": 4,
+        "dose_unit": "tablets",
+        "form": "tablet",
+        "schedule": "workout_day",
+        "notes": "2 pre + 2 post",
+    },
+    {
+        "name": "Beta-alanine",
+        "dose_amount": 1500,
+        "dose_unit": "mg",
+        "form": "capsule",
+        "schedule": "pre",
+        "notes": "2 capsules",
+    },
+]

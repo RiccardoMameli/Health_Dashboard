@@ -1,0 +1,36 @@
+{
+  "status": 0,
+  "body": {
+    "updatetime": 1788000000,
+    "timezone": "Europe/London",
+    "more": false,
+    "offset": 0,
+    "measuregrps": [
+      {
+        "grpid": 900000001,
+        "attrib": 0,
+        "date": 1787900400,
+        "created": 1787900400,
+        "category": 1,
+        "measures": [
+          {"value": 84230, "type": 1, "unit": -3},
+          {"value": 1812, "type": 6, "unit": -2},
+          {"value": 68950, "type": 76, "unit": -3},
+          {"value": 3420, "type": 88, "unit": -3},
+          {"value": 5540, "type": 77, "unit": -2}
+        ]
+      },
+      {
+        "grpid": 900000002,
+        "attrib": 0,
+        "date": 1787814000,
+        "created": 1787814000,
+        "category": 1,
+        "measures": [
+          {"value": 84610, "type": 1, "unit": -3},
+          {"value": 15340, "type": 8, "unit": -3}
+        ]
+      }
+    ]
+  }
+}

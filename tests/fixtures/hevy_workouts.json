@@ -1,0 +1,33 @@
+{
+  "page": 1,
+  "page_count": 1,
+  "workouts": [
+    {
+      "id": "b459cba5-cd7c-463c-bd8d-tc001",
+      "title": "Push A",
+      "description": "Felt strong",
+      "start_time": "2026-09-01T17:30:00Z",
+      "end_time": "2026-09-01T18:45:00Z",
+      "exercises": [
+        {
+          "index": 0,
+          "title": "Bench Press (Barbell)",
+          "exercise_template_id": "79D0BB3A",
+          "sets": [
+            {"index": 0, "type": "warmup", "weight_kg": 40, "reps": 10, "rpe": null},
+            {"index": 1, "type": "normal", "weight_kg": 80, "reps": 8, "rpe": 8},
+            {"index": 2, "type": "normal", "weight_kg": 80, "reps": 7, "rpe": 9}
+          ]
+        },
+        {
+          "index": 1,
+          "title": "Overhead Press (Barbell)",
+          "exercise_template_id": "7B8D84E8",
+          "sets": [
+            {"index": 0, "type": "normal", "weight_kg": 45, "reps": 10, "rpe": 8}
+          ]
+        }
+      ]
+    }
+  ]
+}

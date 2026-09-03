@@ -1,0 +1,30 @@
+name: Daily sync
+
+# Plan 4.3: GitHub Actions cron. Free, no platform lock-in, adequate for a
+# daily job. 05:45 UTC so data is in before the 06:30 brief in Phase 2.
+on:
+  schedule:
+    - cron: "45 5 * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull each source
+        run: |
+          set -e
+          for source in hevy withings; do
+            echo "syncing $source"
+            curl -fsS -X POST \
+              -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
+              "${{ secrets.API_BASE_URL }}/api/v1/sync/$source"
+            echo
+          done
+
+      # Dead-man's switch (plan 4.3 / R6). If this ping stops arriving,
+      # Healthchecks emails you. Silent ingestion failure is the number one
+      # way a self-hosted dashboard rots.
+      - name: Ping Healthchecks
+        if: success()
+        run: curl -fsS -m 10 "${{ secrets.HEALTHCHECKS_PING_URL }}"
