@@ -69,10 +69,13 @@ from app.services.timeutil import sleep_midpoint_minutes, utcnow
 
 #: Minimum spread per metric, in that metric's own units. Without these a
 #: quiet fortnight produces a near-zero SD and every trivial difference reads
-#: as a three-sigma event.
+#: as a three-sigma event. Each is a plausible *minimum* night-to-night
+#: variation, not a typical one: real sleep varies by the best part of an
+#: hour, so a floor much below that turns an ordinary short night into a
+#: three-sigma outlier and saturates the readiness score.
 SD_FLOORS = {
-    "sleep_duration_min": 15.0,
-    "sleep_efficiency_pct": 2.0,
+    "sleep_duration_min": 30.0,
+    "sleep_efficiency_pct": 3.0,
     "resting_hr": 2.0,
     "hrv_ms": 5.0,
     "subjective_overall": 0.8,

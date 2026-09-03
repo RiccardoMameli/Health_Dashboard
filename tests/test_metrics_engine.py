@@ -184,8 +184,35 @@ def test_rest_days_and_training_load(session):
     out = compute_day(session, TODAY)
     assert out.acute_load_7d == pytest.approx(4 * 480.0)
     assert out.days_since_rest == 4
-    assert out.acwr is not None
     assert out.last_workout.title == "Push A"
+    # Four sessions in an otherwise empty month is not a 4.0 spike; there is
+    # no chronic load to compare against yet, so the ratio is withheld.
+    assert out.acwr is None
+
+
+def test_acwr_appears_once_training_is_regular(session):
+    seed_history(session)
+    for offset in range(1, 25):  # every other day for the last three weeks
+        if offset % 2:
+            continue
+        day = TODAY - timedelta(days=offset)
+        session.add(
+            Workout(
+                date=day,
+                start_at=datetime(day.year, day.month, day.day, 18, 0, tzinfo=UTC),
+                type="strength",
+                duration_min=60.0,
+                perceived_exertion_1_10=8.0,
+                title="Push A",
+                source="hevy",
+                source_record_id=f"reg-{day}",
+            )
+        )
+    session.commit()
+
+    out = compute_day(session, TODAY)
+    assert out.acwr is not None
+    assert out.chronic_load_28d > 0
 
 
 def test_persist_is_idempotent(session):

@@ -108,7 +108,7 @@ def test_sleep_debt_penalty_saturates():
 
 def test_z_scores_are_clamped_so_one_freak_night_cannot_dominate():
     at_clamp = compute_readiness(
-        ReadinessInput(data_completeness_pct=100.0, **dict(NEUTRAL, sleep_duration_z=-3.0))
+        ReadinessInput(data_completeness_pct=100.0, **dict(NEUTRAL, sleep_duration_z=-2.0))
     )
     beyond = compute_readiness(
         ReadinessInput(data_completeness_pct=100.0, **dict(NEUTRAL, sleep_duration_z=-50.0))
@@ -128,8 +128,25 @@ def test_score_stays_inside_zero_to_one_hundred():
             subjective_z=-3.0,
         )
     )
-    assert awful.score == 0.0  # every penalty at once still cannot go negative
+    # Every penalty at once lands near the floor but keeps some resolution:
+    # the scale is not so steep that two bad readings exhaust it.
+    assert 0.0 <= awful.score < 15.0
     assert awful.status == STATUS_RED
+
+    # And the floor itself holds when the weights are turned up.
+    floored = compute_readiness(
+        ReadinessInput(
+            data_completeness_pct=100.0,
+            sleep_duration_z=-3.0,
+            sleep_efficiency_z=-3.0,
+            rhr_deviation_z=3.0,
+            sleep_debt_14d_min=5000.0,
+            acwr=3.0,
+            subjective_z=-3.0,
+        ),
+        ReadinessWeights(sleep_duration=40.0, rhr_deviation=40.0, hrv_deviation=0.0),
+    )
+    assert floored.score == 0.0
 
     great = compute_readiness(
         ReadinessInput(

@@ -30,9 +30,12 @@ BASELINE_SCORE = 100.0
 #: Below this, emit no score (plan 6.3).
 MIN_COMPLETENESS_PCT = 60.0
 
-#: Z-scores are clamped before weighting: one freak night should move the
-#: score, not dominate it.
-Z_CLAMP = 3.0
+#: Z-scores are clamped before weighting. Two SD, not three: past two, the
+#: difference between "bad" and "very bad" on one metric is not information
+#: the score should act on, and letting it through means a single reading
+#: takes a third of the scale on its own. What should push a day further down
+#: is more things being wrong, not one thing being extremely wrong.
+Z_CLAMP = 2.0
 
 #: Score bands for the readiness ring. Amber is deliberately wide — in the
 #: baseline phase the score is a prompt to look, not a verdict.

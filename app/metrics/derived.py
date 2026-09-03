@@ -33,6 +33,13 @@ CHRONIC_WINDOW_DAYS = 28
 #: ACWR is meaningless until the chronic window is mostly filled.
 MIN_DAYS_FOR_ACWR = 21
 
+#: ...and until there is actually training in it. Four sessions crammed into
+#: the last week of an otherwise empty month produce a ratio of 4.0, which is
+#: arithmetically correct and tells you nothing: there is no chronic load to
+#: compare against yet. Two sessions a week over the window is the floor for
+#: the ratio meaning anything.
+MIN_TRAINING_DAYS_FOR_ACWR = 8
+
 #: ACWR below this is unpenalised; the penalty ramps to 1.0 at the ceiling.
 ACWR_PENALTY_FLOOR = 1.3
 ACWR_PENALTY_CEILING = 1.8
@@ -132,14 +139,20 @@ def acwr(
     daily_loads: Sequence[float],
     *,
     min_days: int = MIN_DAYS_FOR_ACWR,
+    min_training_days: int = MIN_TRAINING_DAYS_FOR_ACWR,
 ) -> float | None:
     """Acute:chronic workload ratio (plan 6.2).
 
     None until there is enough history for the chronic window to mean
     anything, and None when chronic load is zero — a ratio against nothing is
-    not an infinite spike, it is an unanswerable question.
+    not an infinite spike, it is an unanswerable question. Reporting a
+    spurious 4.0 to the brief would be worse than reporting nothing, because
+    the brief would then have to explain it.
     """
     if len(daily_loads) < min_days:
+        return None
+    window = daily_loads[-CHRONIC_WINDOW_DAYS:]
+    if sum(1 for load in window if load > 0) < min_training_days:
         return None
     chronic = chronic_load(daily_loads)
     if chronic <= 0:

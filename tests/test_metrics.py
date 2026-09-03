@@ -232,3 +232,14 @@ def test_volume_progression_drops_unobserved_weeks():
         128.57, abs=0.01
     )
     assert volume_progression_slope([1000.0, None, None]) is None
+
+
+def test_acwr_withheld_when_the_chronic_window_is_nearly_empty():
+    """Four sessions in the last week of an empty month is not a 4.0 spike —
+    it is a person who has just started training."""
+    loads = [0.0] * 24 + [480.0] * 4
+    assert acwr(loads) is None
+
+    # Once training is regular, the ratio means something again.
+    regular = [480.0 if day % 2 else 0.0 for day in range(28)]
+    assert acwr(regular) is not None

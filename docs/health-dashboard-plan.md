@@ -379,7 +379,7 @@ Pure functions over the database. No LLM involvement. Every one unit-tested agai
 | **Session load** | duration_min × RPE, or volume-load for strength | Simple, robust, no HR dependency |
 | **Acute load** | 7-day rolling sum of session load | |
 | **Chronic load** | 28-day rolling average of weekly load | |
-| **ACWR** | acute ÷ chronic | > 1.5 flags a spike. A heuristic — treat as a prompt to look, not a verdict. |
+| **ACWR** | acute ÷ chronic | > 1.5 flags a spike. A heuristic — treat as a prompt to look, not a verdict. Withheld entirely until the chronic window holds ≥ 8 training days: four sessions in an otherwise empty month give a ratio of 4.0 that is arithmetically correct and means nothing. |
 | **Weight EWMA** | α = 0.1 | Never show raw daily weight as a trend |
 | **Weight trend** | slope of EWMA over 14 days, kg/week | |
 | **Protein g/kg** | protein_g ÷ weight_ewma_kg | Target ~1.6–2.2 g/kg. **NULL under MyFitnessPal** |
@@ -401,7 +401,9 @@ readiness = 100
           + w7 · subjective_yesterday_z
 ```
 
-- Weights live in config, not code.
+- Weights live in config, not code, and are **provisional**: nothing in six weeks of baseline data can validate them. Revisit against how days actually felt.
+- Z-scores are clamped at ±2 SD before weighting, and each metric has a minimum SD ("a quiet fortnight is not zero variance"). Past two SD, the difference between bad and very bad on one reading is not information the score should act on; what should move a day further down is *more* things being wrong.
+- The formula starts at 100, so every positive contribution is clipped: an exceptional day and an ordinary one both read 100, and the score is in practice a deduction scale. Left as specified; lowering the starting point would give good days headroom.
 - If HRV is unavailable, redistribute w4 across w1–w3 and set `readiness_confidence = reduced`.
 - If completeness < 60%, emit no score — emit `insufficient_data`.
 - Store `readiness_components` as JSON so the brief can name the top two contributors verbatim.
@@ -785,6 +787,7 @@ Each phase has an acceptance test. Do not start the next until the current one p
 
 ### Phase 2 — The AI brief
 - Metrics engine v1 — baselines, deviations, training load, weight EWMA.
+- **Readiness v1** — the §6.3 fallback formula with its component breakdown. Listed under Phase 4 below, but the §9.1 input contract carries `readiness`, so the brief cannot be built without it. Phase 4 adds the wear-bias-aware presentation and the screens.
 - Daily brief per the §9 contracts, phase-locked to `baseline`.
 - Email delivery at 06:30 with feedback capture.
 - Supplement checklist seeded; protocol change log.

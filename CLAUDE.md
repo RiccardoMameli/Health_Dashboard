@@ -11,9 +11,16 @@ been built, newest entry first — append to it at the end of a working session.
 ## Current state
 
 Phase 1 complete: schema, ingestion, Hevy and Withings adapters, check-in and
-supplement APIs, data health. 41 tests passing.
+supplement APIs, data health.
 
-Phase 2 is next: metrics engine, readiness score, daily brief, email delivery.
+Phase 2 code complete: metrics engine (`app/metrics/`, pure functions),
+readiness score, the DB assembler (`app/services/metrics_engine.py`), the
+daily brief with its traceability guard (`app/ai/`), email delivery, and the
+06:30 job (`scripts/daily_brief.py`). 126 tests passing.
+
+Phase 2's *gate* is not met and cannot be met by writing code: it needs seven
+consecutive days of an accurate brief against real data. Same for Phase 1's
+gate — seven days of check-ins and a full Hevy/Withings import.
 
 ## Invariants — do not break these
 
@@ -22,6 +29,11 @@ tested code. The AI layer receives a compact pre-computed JSON summary and only
 prioritises, explains and writes. Never pass a raw time-series to a model. This
 is the single most important decision in the system; violating it produces
 confident fabrication that is very hard to detect.
+
+This is *enforced*, not trusted: `app/ai/verify.py` checks every number in a
+generated brief against the input snapshot, retries once naming the offending
+figures, and flags the brief if it still does not trace. A unit conversion
+counts as a violation — "5h42m" from a stored 342 minutes is arithmetic.
 
 **Phase-locked language.** Briefs carry a `phase` field. In `baseline` (first
 six weeks) causal claims are forbidden — facts and deviations only. In
@@ -62,6 +74,8 @@ targets that trend toward restriction.
 - Adapters implement `Adapter` (`backfill` / `incremental`).
 - Secrets come from the environment. Never commit a key; gitleaks runs pre-commit.
 - Run `pytest -q` and `ruff check app tests` before committing.
+- Weights, thresholds and windows live in `app/config.py` or as named module
+  constants with a comment saying why that number. No bare magic numbers.
 
 ## Phase gates
 

@@ -6,6 +6,88 @@ of each working session.
 
 ---
 
+## 3 September 2026 — Phase 2: metrics engine, readiness, the brief
+
+**Status: Phase 2 code complete. The phase *gate* is not met and cannot be met
+by writing code — it needs seven consecutive days of an accurate brief against
+real data.** 126 tests passing.
+
+### What exists
+
+- **`app/metrics/`** — pure functions, no database, no clock. Baselines
+  (30-day rolling median, withheld below 14 observations, D3 wear-bias guard),
+  derived metrics (sleep debt, midpoint variance, session/acute/chronic load,
+  ACWR, weight EWMA and trend, protein g/kg, completeness, volume
+  progression), and the §6.3 readiness score with its component breakdown.
+- **`app/services/metrics_engine.py`** — the only module that knows both SQL
+  and the metrics. Windows the data, drops excluded days, persists
+  `daily_metrics`, and renders the §9.1 input contract.
+- **`app/ai/`** — the phase-locked system prompt, the structured output
+  contract, the Anthropic call, and the traceability guard.
+- **`app/services/email.py`** — the brief rendered in the Glacier language,
+  restricted to what mail clients support.
+- **`scripts/daily_brief.py`** and a step in the sync workflow — the 06:30 job,
+  idempotent, with meaningful exit codes.
+- Endpoints: `POST /brief`, `GET /brief/{day}`, `GET /brief/input/{day}`,
+  `GET /brief/{day}/preview`, `POST /brief/{id}/feedback`, `GET /metrics/{day}`.
+  `/today` now carries real readiness.
+
+### The traceability guard
+
+Plan §14's Phase 2 gate is "every number in it traces back to the input JSON".
+That is now checked in code rather than trusted: every numeric token in a
+generated brief is matched against the input snapshot, with one retry naming
+the offending figures, and the brief is stored flagged if it still does not
+trace. A unit conversion counts as a violation — "5h42m" from a stored 342
+minutes is arithmetic the model was told not to do, and it reads exactly like
+a measurement. The guard caught two of its own test fixtures during the build.
+
+### Four things found by looking at real output
+
+1. **ACWR of 4.0.** Four sessions in an otherwise empty month gave a ratio
+   that was arithmetically correct and meaningless. ACWR is now withheld until
+   the chronic window holds at least eight training days.
+2. **A single bad reading took a third of the scale.** Z-scores are now
+   clamped at ±2 SD rather than ±3: past two, the difference between bad and
+   very bad on one metric is not information the score should act on.
+3. **SD floors were too tight.** A 15-minute floor on night-to-night sleep
+   variation made an ordinary short night a three-sigma outlier. Raised to
+   values that are plausible minimums rather than implausible ones.
+4. **Two definitions of "weight trend".** The Today endpoint had its own
+   7-vs-7 average difference, contradicting the engine's EWMA slope. Deleted;
+   there is now one definition. Supplement adherence had the same problem and
+   moved to `app/services/supplements.py`.
+
+### Decisions worth recording
+
+- **Readiness lands in Phase 2, not Phase 4.** §14 lists it under Phase 4, but
+  the §9.1 input contract carries `readiness`, so the brief cannot be built
+  without it. Noted in the plan.
+- **Weights are provisional and configurable.** Scaled so a single bad night
+  stays amber while an accumulating pattern goes red. Nothing in six weeks of
+  baseline data can validate them.
+- **The phase never promotes itself.** `BRIEF_PHASE` is config and stays on
+  `baseline` until deliberately changed. A brief must not start making causal
+  claims because six weeks elapsed.
+- **No template fallback.** With no API key the job fails loudly rather than
+  sending something that looks generated.
+
+### Outstanding, not code
+
+1. Keys: Anthropic, Resend, plus the Phase 0 set still outstanding.
+2. **The readiness score has never seen real data.** Every number above was
+   checked against seeded fixtures and a simulation with realistic variance.
+3. Phase 1's gate is still open: seven days of check-ins, and a full Hevy and
+   Withings import.
+
+### Next session
+
+Phase 3 is gated on Phase 2's acceptance test, so the useful work before then
+is the eval set (§9.4: ~15 hand-picked days including a no-watch day and a
+missing-macros day) and the Expo app's Today screen against `docs/ui/`.
+
+---
+
 ## 3 September 2026 — UI design language locked
 
 **No application code changed. Documentation and one static reference file.**

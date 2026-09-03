@@ -30,6 +30,17 @@ class Settings(BaseSettings):
     # AI layer (Phase 2)
     anthropic_api_key: str | None = None
 
+    # Phase-locked language (plan 9.2). Promotion out of `baseline` is a
+    # deliberate act at Phase 5, not a timer — the brief must never quietly
+    # start making causal claims because six weeks elapsed.
+    brief_phase: str = "baseline"
+
+    # Delivery (plan 11). Phase 3 replaces email with push.
+    resend_api_key: str | None = None
+    brief_email_to: str | None = None
+    brief_email_from: str = "brief@localhost"
+    checkin_url: str | None = None
+
     # Ops
     healthchecks_ping_url: str | None = None
 

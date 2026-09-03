@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session, selectinload
 from app.api.deps import db, require_token
 from app.models import BodyMeasurement, Checkin, Workout
 from app.schemas.common import BodyMeasurementOut, WorkoutOut
+from app.services import brief as brief_service
+from app.services.metrics_engine import compute_day
 from app.services.timeutil import local_date, utcnow
 
 router = APIRouter(tags=["data"], dependencies=[Depends(require_token)])
@@ -49,12 +51,15 @@ def list_body(days: int = 90, session: Session = Depends(db)) -> list[BodyMeasur
 
 @router.get("/today")
 def today(session: Session = Depends(db)) -> dict:
-    """The minimal Today screen payload for Phase 1.
+    """The Today screen payload (plan 10.1).
 
-    Deliberately thin. Readiness, the brief and the metrics engine land in
-    Phase 2; nothing here fabricates a number it cannot compute yet.
+    Readiness comes from the metrics engine and is None whenever the day is
+    too sparse to score — the screen renders that refusal rather than
+    substituting a number.
     """
     day = local_date(utcnow())
+    computed = compute_day(session, day)
+    brief_row = brief_service.get(session, day)
 
     last_workout = session.execute(
         select(Workout).order_by(Workout.start_at.desc()).limit(1)
@@ -68,12 +73,6 @@ def today(session: Session = Depends(db)) -> dict:
             .limit(14)
         ).scalars()
     )
-    weight_trend = None
-    if len(recent_weights) >= 8:
-        newest = sum(w.weight_kg for w in recent_weights[:7]) / 7
-        oldest = sum(w.weight_kg for w in recent_weights[7:14]) / len(recent_weights[7:14])
-        weight_trend = round(newest - oldest, 2)
-
     subjective = list(
         session.execute(
             select(Checkin).where(Checkin.date >= day - timedelta(days=29)).order_by(Checkin.date)
@@ -94,18 +93,42 @@ def today(session: Session = Depends(db)) -> dict:
             if last_workout
             else None
         ),
-        "weight": (
-            {
-                "latest_kg": recent_weights[0].weight_kg if recent_weights else None,
-                "trend_kg_per_week": weight_trend,
-                "observations": len(recent_weights),
-            }
-        ),
+        "weight": {
+            # EWMA and its slope, from the metrics engine. Raw daily weight is
+            # never shown as a trend (plan 6.2), and there is exactly one
+            # definition of "trend" in the system.
+            "latest_kg": recent_weights[0].weight_kg if recent_weights else None,
+            "ewma_kg": computed.weight_ewma_kg,
+            "trend_kg_per_week": computed.weight_trend_kg_per_week,
+            "observations": len(recent_weights),
+        },
         "subjective_30d": [
             {"date": c.date.isoformat(), "overall": c.overall_1_10} for c in subjective
         ],
-        "readiness": None,
-        "readiness_note": "Readiness lands in Phase 2 with the metrics engine.",
+        "readiness": (computed.readiness.as_dict()["score"] if computed.readiness else None),
+        "readiness_detail": computed.readiness.as_dict() if computed.readiness else None,
+        "data_completeness_pct": round(computed.data_completeness_pct, 1),
+        "sleep": {
+            "duration_min": computed.sleep_duration_min,
+            "baseline_min": (computed.sleep_baseline.median if computed.sleep_baseline else None),
+            "debt_14d_min": computed.sleep_debt_14d_min,
+        },
+        "resting_hr": {
+            "value": computed.resting_hr,
+            "baseline": computed.rhr_baseline.median if computed.rhr_baseline else None,
+            "deviation_bpm": computed.rhr_deviation_bpm,
+        },
+        "training": {"acwr": computed.acwr, "days_since_rest": computed.days_since_rest},
+        "brief": (
+            {
+                "id": brief_row.id,
+                "status": (brief_row.output or {}).get("status"),
+                "headline": (brief_row.output or {}).get("headline"),
+                "feedback_rating": brief_row.feedback_rating,
+            }
+            if brief_row is not None
+            else None
+        ),
     }
 
 
