@@ -379,7 +379,7 @@ Pure functions over the database. No LLM involvement. Every one unit-tested agai
 | **Session load** | duration_min × RPE, or volume-load for strength | Simple, robust, no HR dependency |
 | **Acute load** | 7-day rolling sum of session load | |
 | **Chronic load** | 28-day rolling average of weekly load | |
-| **ACWR** | acute ÷ chronic | > 1.5 flags a spike. A heuristic — treat as a prompt to look, not a verdict. |
+| **ACWR** | acute ÷ chronic | > 1.5 flags a spike. A heuristic — treat as a prompt to look, not a verdict. Withheld entirely until the chronic window holds ≥ 8 training days: four sessions in an otherwise empty month give a ratio of 4.0 that is arithmetically correct and means nothing. |
 | **Weight EWMA** | α = 0.1 | Never show raw daily weight as a trend |
 | **Weight trend** | slope of EWMA over 14 days, kg/week | |
 | **Protein g/kg** | protein_g ÷ weight_ewma_kg | Target ~1.6–2.2 g/kg. **NULL under MyFitnessPal** |
@@ -401,7 +401,9 @@ readiness = 100
           + w7 · subjective_yesterday_z
 ```
 
-- Weights live in config, not code.
+- Weights live in config, not code, and are **provisional**: nothing in six weeks of baseline data can validate them. Revisit against how days actually felt.
+- Z-scores are clamped at ±2 SD before weighting, and each metric has a minimum SD ("a quiet fortnight is not zero variance"). Past two SD, the difference between bad and very bad on one reading is not information the score should act on; what should move a day further down is *more* things being wrong.
+- The formula starts at 100, so every positive contribution is clipped: an exceptional day and an ordinary one both read 100, and the score is in practice a deduction scale. Left as specified; lowering the starting point would give good days headroom.
 - If HRV is unavailable, redistribute w4 across w1–w3 and set `readiness_confidence = reduced`.
 - If completeness < 60%, emit no score — emit `insufficient_data`.
 - Store `readiness_components` as JSON so the brief can name the top two contributors verbatim.
@@ -591,6 +593,137 @@ Written into the system prompt and regression-tested against the eval set:
 - Every number tappable to reveal its definition and inputs. No black boxes.
 - Missing data rendered explicitly as a gap. Never interpolated silently.
 
+### 10.3 Design language — "Glacier"
+
+Locked. The reference implementation is `docs/ui/glacier-today.html` — the Today
+screen in both themes, rendered from the §9.1 example payload. The Expo app
+implements these tokens. Nothing below is decoration: five of the rules in
+§10.3.5 exist to make the invariants in §5.1, §9.2 and §12 *visible* rather than
+merely true.
+
+**Intent.** Apple's spacing and restraint, dark-first, with an instrument-panel
+voice carried by monospaced micro-labels. Glanceable at 06:30 and honest about
+what it cannot see.
+
+#### 10.3.1 Colour
+
+Two themes, both designed — light is not an inversion of dark. Components read
+tokens, never literals, so a colour is never defined in only one theme.
+
+| Token | Dark | Light | Use |
+|---|---|---|---|
+| `bg` | `#080B10` | `#EEF1F5` | page ground, beneath two accent veils |
+| `surface` | `rgba(255,255,255,.045)` | `rgba(255,255,255,.74)` | glass card fill |
+| `surface-2` | `rgba(255,255,255,.075)` | `rgba(255,255,255,.94)` | inset blocks, chart tracks |
+| `hairline` | `rgba(255,255,255,.10)` | `rgba(12,22,32,.11)` | 1px borders and rules |
+| `hairline-2` | `rgba(255,255,255,.20)` | `rgba(12,22,32,.22)` | dashed gap outlines, emphasis |
+| `ink` | `#EAF0F6` | `#0D141B` | primary text and figures |
+| `ink-2` | `#9BA9B8` | `#4B5866` | secondary text |
+| `ink-3` | `#68747F` | `#7B8794` | micro-labels, axis text |
+| `accent` | `#5FD0E6` | `#0E8CA8` | charts, controls, anything touchable |
+| `accent-soft` | `rgba(95,208,230,.16)` | `rgba(14,140,168,.13)` | area fills, selected chips |
+| `on-accent` | `#04161C` | `#FFFFFF` | text on an accent fill |
+| `good` | `#7CC46A` | `#3F8F3A` | status green |
+| `warn` | `#E9A94A` | `#9E6B14` | status amber |
+| `crit` | `#EE6C63` | `#C24A40` | status red, negative contributors |
+
+The ground carries two low-opacity radial veils — glacier cyan top-left, a cool
+iris top-right — fixed to the viewport. They are the only gradients in the
+system.
+
+**Glacier cyan is the interface; green, amber and red are the status palette.**
+The accent is never used to mean "good", and a status colour is never used for
+decoration or for a chart series. This is what makes an amber ring legible as
+amber rather than as styling.
+
+Source provenance uses its own muted dots, never the status or accent hues:
+Samsung Health `#5B93D6`, Hevy `#D9803F`, Withings `#4FB3C4`, MyFitnessPal
+`#8AA83F`.
+
+#### 10.3.2 Type
+
+| Role | Face | Treatment |
+|---|---|---|
+| Figures and headlines | **Sora** 500/600/700 | `tabular-nums`, tight tracking (−0.02em, −0.04em on large figures) |
+| Body and UI | **Manrope** 400–700 | 15px base, 1.5 line height, ~65ch measure |
+| Micro-labels, evidence, units | **JetBrains Mono** 400–600 | 10px, 0.14em tracking, uppercase for labels |
+
+The mono is load-bearing, not stylistic: it carries the raw numbers under every
+AI claim ("342 MIN · BASELINE 430 MIN"), which is what keeps the narration
+visibly standing on the metrics engine rather than replacing it. On native, San
+Francisco may substitute for Manrope; Sora and JetBrains Mono ship with the app.
+
+#### 10.3.3 Materials and layout
+
+- **Glass.** `surface` over the veiled ground, `saturate(150%) blur(20px)`, a 1px
+  `hairline` border, one soft shadow. No inner glows, no gradient borders.
+- **Radii** 10 / 16 / 22 px — controls, inset blocks, cards.
+- **Not everything is a card.** Inside a card, separate with hairline rules and
+  spacing. Nested cards are not used. A *dashed* container means one thing only:
+  missing data.
+- **Grid.** 12 columns, 14px gutter, 1180px max. One column below 1000px; tiles
+  go full width below 560px.
+- **Mobile is the primary composition.** Today is a single scrolling column:
+  readiness → brief → check-in (only while outstanding) → four tiles →
+  supplements → not measured.
+
+#### 10.3.4 Components
+
+- **Readiness gauge.** 270° arc, gap at the bottom, 13px stroke, round caps,
+  ends labelled 0 and 100. Painted in the **status** colour. Score in Sora 60px
+  over "of 100". Beneath: the status word, the confidence sentence whenever
+  `readiness_confidence = reduced`, then the top two `readiness_components` as
+  name, signed impact, and a bar scaled to the largest contributor.
+  `insufficient_data` renders as the empty dashed arc with an em-dash — never a
+  zero, never a placeholder score.
+- **Brief.** Headline in Sora, ≤ 30ch. Each `why` is a hairline rule, the
+  observation, its confidence chip, and its evidence line in mono. `do_today`
+  is numbered because priority is ordered. `training_recommendation` sits in a
+  filled block; `data_caveats` behind an amber rule. One-tap Yes/No writes
+  `feedback_rating` (§9.4).
+- **Metric tile.** Micro-label and signed delta on one line; the figure in Sora
+  with its unit in body weight; a micro-chart; a foot carrying the source chip
+  and the comparison basis ("median 52", "EWMA · 30 d").
+- **Micro-charts.** 2px lines, one emphasised endpoint dot, baseline as a shaded
+  band or dashed rule, axis labels only at values the chart actually reaches.
+  No gridlines and no legends — a single series is named by its tile.
+- **Gaps.** A missing day inside a series is a hatched, dashed, full-height
+  column. An unavailable metric is a dashed container holding an em-dash and the
+  reason ("MyFitnessPal does not sync macros. Open item O2.").
+- **Chips.** Source chips (5px dot + mono caps), confidence chips, and
+  confounder tags as pills that fill with `accent-soft` when selected.
+- **Phase pill.** Permanent in the top bar beside data completeness:
+  `BASELINE · DAY 12 OF 42`. Its wording changes by phase; it never disappears.
+
+#### 10.3.5 The five rules the UI enforces
+
+1. **A gap is drawn as a gap.** Never a zero, never an interpolation, never a
+   smoothed line across a missing night (§5.1).
+2. **The phase is always on screen.** The pill is why the brief states
+   deviations and claims no causes (§9.2).
+3. **Status colour never travels alone.** Green, amber and red cannot be
+   separated by colour alone under deuteranopia or protanopia, so every status
+   carries its word and a glyph.
+4. **No number is a black box.** Tap any figure for its definition, inputs,
+   source and last sync (§10.2).
+5. **Confidence sits with the claim,** not in a footnote — the chip is on the
+   `why` line it qualifies.
+
+#### 10.3.6 Motion and accessibility
+
+- One orchestrated load: the arc sweeps and the score counts up over ~1.1s,
+  cubic ease-out. Everything else is a 120–150ms state change.
+  `prefers-reduced-motion` disables all of it.
+- Body ink ≥ 4.5:1 contrast; micro-labels ≥ 3:1 and never the sole carrier of
+  meaning.
+- Hit targets ≥ 44px on native. Every interactive element has a visible focus
+  state.
+- Chart text and marks take the same tokens as the surface behind them, so both
+  themes remain legible without a second palette.
+
+The remaining six screens (§10.1) inherit these tokens; their compositions are
+not designed yet. Phase 3 builds the language into the Expo app.
+
 ---
 
 ## 11. Delivery
@@ -654,6 +787,7 @@ Each phase has an acceptance test. Do not start the next until the current one p
 
 ### Phase 2 — The AI brief
 - Metrics engine v1 — baselines, deviations, training load, weight EWMA.
+- **Readiness v1** — the §6.3 fallback formula with its component breakdown. Listed under Phase 4 below, but the §9.1 input contract carries `readiness`, so the brief cannot be built without it. Phase 4 adds the wear-bias-aware presentation and the screens.
 - Daily brief per the §9 contracts, phase-locked to `baseline`.
 - Email delivery at 06:30 with feedback capture.
 - Supplement checklist seeded; protocol change log.

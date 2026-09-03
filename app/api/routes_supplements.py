@@ -1,7 +1,6 @@
 """Supplement adherence and — the important half — the protocol change log."""
 
 from datetime import date as Date
-from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
@@ -18,13 +17,12 @@ from app.schemas.supplements import (
     SupplementOut,
 )
 from app.services.ingest import ensure_day
+from app.services.supplements import WORKOUT_ONLY_SCHEDULES, adherence_7d
 from app.services.timeutil import local_date, utcnow
 
 router = APIRouter(
     prefix="/supplements", tags=["supplements"], dependencies=[Depends(require_token)]
 )
-
-WORKOUT_ONLY_SCHEDULES = {"workout_day", "pre", "post"}
 
 
 @router.get("", response_model=list[SupplementOut])
@@ -68,45 +66,8 @@ def checklist(day: Date | None = None, session: Session = Depends(db)) -> Supple
         date=day,
         items=items,
         workout_logged=workout_logged,
-        adherence_7d_pct=_adherence_7d(session, day),
+        adherence_7d_pct=adherence_7d(session, day),
     )
-
-
-def _adherence_7d(session: Session, day: Date) -> float:
-    """Taken / expected over the trailing week, workout-day items included
-    only on days a workout was actually logged."""
-    start = day - timedelta(days=6)
-    active = list(
-        session.execute(select(Supplement).where(Supplement.is_active.is_(True))).scalars()
-    )
-    if not active:
-        return 0.0
-
-    workout_days = {
-        row
-        for row in session.execute(
-            select(Workout.date).where(Workout.date >= start, Workout.date <= day)
-        ).scalars()
-    }
-
-    expected = 0
-    for offset in range(7):
-        d = start + timedelta(days=offset)
-        for s in active:
-            if s.schedule in WORKOUT_ONLY_SCHEDULES and d not in workout_days:
-                continue
-            expected += 1
-    if expected == 0:
-        return 0.0
-
-    taken = session.execute(
-        select(func.count(SupplementLog.supplement_id)).where(
-            SupplementLog.date >= start,
-            SupplementLog.date <= day,
-            SupplementLog.taken.is_(True),
-        )
-    ).scalar_one()
-    return round(min(taken / expected, 1.0) * 100, 1)
 
 
 @router.post("/log", status_code=204)

@@ -1,7 +1,9 @@
 name: Daily sync
 
 # Plan 4.3: GitHub Actions cron. Free, no platform lock-in, adequate for a
-# daily job. 05:45 UTC so data is in before the 06:30 brief in Phase 2.
+# daily job. 05:45 UTC pulls each source, then the brief goes out — 06:45
+# BST, which is the 06:30 slot in plan 11 allowing for Actions' scheduling
+# lag. UTC year-round, so the local time shifts by an hour in winter.
 on:
   schedule:
     - cron: "45 5 * * *"
@@ -21,6 +23,17 @@ jobs:
               "${{ secrets.API_BASE_URL }}/api/v1/sync/$source"
             echo
           done
+
+      # Plan 9.1/11: the brief is written after the sync, from data that has
+      # just landed. Generated and delivered in one call so a partial run
+      # cannot leave a brief sitting unsent.
+      - name: Generate and send the daily brief
+        run: |
+          set -e
+          curl -fsS -X POST \
+            -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
+            "${{ secrets.API_BASE_URL }}/api/v1/brief?send=true" > /dev/null
+          echo "brief sent"
 
       # Dead-man's switch (plan 4.3 / R6). If this ping stops arriving,
       # Healthchecks emails you. Silent ingestion failure is the number one
