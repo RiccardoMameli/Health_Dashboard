@@ -1,7 +1,7 @@
 # Health Dashboard — API
 
 Personal health aggregation with a deterministic metrics engine and an AI
-narration layer. Built to the spec in `claude/health-dashboard-plan.md` (v1.0).
+narration layer. Built to the spec in `docs/health-dashboard-plan.md` (v1.0).
 
 **Status: Phase 1 complete.** Ingestion, check-in, supplements and data health
 are working. The metrics engine, readiness score and daily brief are Phase 2.
