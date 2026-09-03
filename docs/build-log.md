@@ -6,6 +6,31 @@ of each working session.
 
 ---
 
+## 3 September 2026 — UI preview made deployable and explorable
+
+`docs/ui/glacier-today.html` now renders from a data object rather than fixed
+markup, with a switcher for four mornings: accumulating, nothing unusual,
+overreached, and watch-not-worn. The last one is the point of the exercise —
+`insufficient_data` renders as an absent arc, an em-dash and "no score", with
+both the sleep and resting-HR tiles showing gaps and the brief refusing to make
+a training recommendation. Claiming the design handles that is cheap; looking
+at it is not.
+
+`netlify.toml` publishes `docs/ui` as a static site. **The backend cannot go on
+Netlify** — there is no Python runtime for Netlify Functions — so FastAPI still
+needs Fly.io or Render per §4.3.
+
+Two bugs found by rendering the states rather than reasoning about them:
+
+1. **An unscoped `.bar` rule.** The sleep chart's `.bar{flex:1}` also claimed
+   the brief caveat's 2px amber rule, stretching it into a wide filled block.
+   Scoped to `.bars .bar`. It had been wrong since the design was first drawn.
+2. **A zero-length arc still paints its round cap**, leaving a coloured dot on
+   the no-score gauge that read as a very low score. The arc is now hidden
+   outright when there is nothing to draw.
+
+---
+
 ## 3 September 2026 — Phase 2: metrics engine, readiness, the brief
 
 **Status: Phase 2 code complete. The phase *gate* is not met and cannot be met

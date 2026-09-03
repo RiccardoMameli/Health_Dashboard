@@ -596,7 +596,12 @@ Written into the system prompt and regression-tested against the eval set:
 ### 10.3 Design language — "Glacier"
 
 Locked. The reference implementation is `docs/ui/glacier-today.html` — the Today
-screen in both themes, rendered from the §9.1 example payload. The Expo app
+screen in both themes, rendered from §9.1-shaped payloads. It carries a scenario
+switcher covering the four mornings the design has to survive: an accumulating
+day, a day with nothing unusual, an overreached day, and a night the watch was
+not worn (no score at all). The last is the one worth looking at, because
+`insufficient_data` and a missing night are easy to claim in a spec and hard to
+draw. Deployable as a static site; `netlify.toml` publishes `docs/ui`. The Expo app
 implements these tokens. Nothing below is decoration: five of the rules in
 §10.3.5 exist to make the invariants in §5.1, §9.2 and §12 *visible* rather than
 merely true.

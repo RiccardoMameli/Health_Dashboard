@@ -1,0 +1,23 @@
+# Netlify hosts the UI reference only (plan §10.3). It is a single static
+# page with no build step.
+#
+# The FastAPI backend cannot run here — Netlify Functions have no Python
+# runtime — so it goes on Fly.io or Render, per plan §4.3.
+
+[build]
+  publish = "docs/ui"
+  command = ""
+
+# Serve the reference implementation at the site root while keeping the
+# filename the plan and the build log refer to.
+[[redirects]]
+  from = "/"
+  to = "/glacier-today.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"

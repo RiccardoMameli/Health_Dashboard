@@ -177,6 +177,24 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
 }
 .st-amber .status-glyph{background:var(--warn)}
 .st-amber .status-name{color:var(--warn)}
+.st-green .status-glyph{background:var(--good)}
+.st-green .status-name{color:var(--good)}
+.st-red .status-glyph{background:var(--crit)}
+.st-red .status-name{color:var(--crit)}
+.st-none .status-glyph{background:var(--ink-3)}
+.st-none .status-name{color:var(--ink-3)}
+
+/* ── scenario switcher: the states the design has to survive ── */
+.scenarios{display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:0 2px 18px}
+.scenarios .micro{margin-right:2px}
+.scenario{
+  font-family:var(--f-body); font-size:12.5px; padding:6px 12px; border-radius:999px;
+  border:1px solid var(--hairline); background:var(--surface); color:var(--ink-2);
+  cursor:pointer; white-space:nowrap;
+  backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+}
+.scenario:hover{border-color:var(--hairline-2); color:var(--ink)}
+.scenario[aria-pressed="true"]{background:var(--accent-soft); border-color:var(--accent); color:var(--accent)}
 .status-name{font-family:var(--f-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase}
 .hero .lede{font-size:14px; color:var(--ink-2); margin:0; max-width:34ch}
 
@@ -254,11 +272,15 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
   position:absolute; left:0; right:0; border-top:1px dashed var(--hairline-2);
   pointer-events:none;
 }
-.bars .baseline span{position:absolute; right:0; top:-15px; font-family:var(--f-mono); font-size:9px; color:var(--ink-3)}
-.bar{flex:1; border-radius:4px 4px 0 0; background:var(--accent); opacity:.42; cursor:default; transition:opacity .15s}
-.bar:hover{opacity:.75}
-.bar.last{opacity:1}
-.bar.missing{
+.bars .baseline span{
+  position:absolute; right:0; top:-16px; font-family:var(--f-mono); font-size:9px;
+  color:var(--ink-3); background:var(--surface-2); padding:1px 4px; border-radius:4px;
+}
+.bars .bar{flex:1; border-radius:4px 4px 0 0; background:var(--accent); opacity:.42;
+  cursor:default; transition:opacity .15s}
+.bars .bar:hover{opacity:.75}
+.bars .bar.last{opacity:1}
+.bars .bar.missing{
   background:repeating-linear-gradient(135deg, var(--hairline) 0 2px, transparent 2px 7px);
   border:1px dashed var(--hairline-2); border-bottom:none;
   border-radius:4px 4px 0 0; opacity:1;
@@ -370,10 +392,18 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
       <b>Glacier</b>
       <span>Thursday 4 September · 06:34</span>
     </div>
-    <span class="pill phase"><i class="dot"></i>Baseline · day 12 of 42</span>
-    <span class="pill"><i class="dot"></i>87% complete</span>
+    <span class="pill phase"><i class="dot"></i><span id="phaseText">Baseline · day 12 of 42</span></span>
+    <span class="pill"><i class="dot"></i><span id="completeness">87% complete</span></span>
     <button class="pill" id="theme" type="button" aria-label="Switch colour theme">Theme</button>
   </header>
+
+  <div class="scenarios" role="group" aria-label="Preview a different morning">
+    <span class="micro">Preview a morning</span>
+    <button class="scenario" type="button" data-scenario="amber" aria-pressed="true">Accumulating</button>
+    <button class="scenario" type="button" data-scenario="green" aria-pressed="false">Nothing unusual</button>
+    <button class="scenario" type="button" data-scenario="red" aria-pressed="false">Overreached</button>
+    <button class="scenario" type="button" data-scenario="nowatch" aria-pressed="false">Watch not worn</button>
+  </div>
 
   <div class="bento">
 
@@ -384,7 +414,7 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
       <div class="gaugewrap">
         <div class="gauge">
           <svg viewBox="0 0 186 186" role="img" aria-label="Readiness 62 out of 100, amber">
-            <circle cx="93" cy="93" r="76" fill="none" stroke="var(--surface-2)" stroke-width="13"
+            <circle id="track" cx="93" cy="93" r="76" fill="none" stroke="var(--surface-2)" stroke-width="13"
                     stroke-linecap="round" stroke-dasharray="358.1 477.5"
                     transform="rotate(-225 93 93)"></circle>
             <circle id="arc" cx="93" cy="93" r="76" fill="none" stroke="var(--warn)" stroke-width="13"
@@ -395,30 +425,32 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
           </svg>
           <div class="center">
             <div class="score" id="score">62</div>
-            <div class="of">of 100</div>
+            <div class="of" id="scoreUnit">of 100</div>
           </div>
         </div>
 
-        <div class="st-amber">
+        <div class="st-amber" id="statusBlock">
           <div class="status-line">
-            <span class="status-glyph" aria-hidden="true">!</span>
-            <span class="status-name">Amber</span>
+            <span class="status-glyph" id="statusGlyph" aria-hidden="true">!</span>
+            <span class="status-name" id="statusName">Amber</span>
           </div>
-          <p class="lede">Confidence reduced — HRV is unavailable, so its weight was redistributed across sleep and resting heart rate.</p>
+          <p class="lede" id="lede">Confidence reduced — HRV is unavailable, so its weight was redistributed across sleep and resting heart rate.</p>
         </div>
       </div>
 
       <div class="contribs">
         <span class="micro">Top contributors</span>
-        <div class="contrib">
-          <span class="name">Sleep debt, 14 days</span>
-          <span class="impact">−18</span>
-          <span class="track"><span class="fill" style="width:72%"></span></span>
-        </div>
-        <div class="contrib">
-          <span class="name">Resting HR deviation</span>
-          <span class="impact">−9</span>
-          <span class="track"><span class="fill" style="width:36%"></span></span>
+        <div id="contribRows">
+          <div class="contrib">
+            <span class="name">Sleep debt, 14 days</span>
+            <span class="impact">−18</span>
+            <span class="track"><span class="fill" style="width:72%"></span></span>
+          </div>
+          <div class="contrib">
+            <span class="name">Resting HR deviation</span>
+            <span class="impact">−9</span>
+            <span class="track"><span class="fill" style="width:36%"></span></span>
+          </div>
         </div>
         <p class="defn">Tap any number to see its definition and inputs.</p>
       </div>
@@ -428,9 +460,9 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     <section class="card brief span-7" aria-labelledby="db">
       <span class="micro" id="db">Daily brief · 06:30</span>
 
-      <h2>Sleep ran 88 minutes under baseline and resting heart rate is 6 bpm above it.</h2>
+      <h2 id="briefHeadline">Sleep ran 88 minutes under baseline and resting heart rate is 6 bpm above it.</h2>
 
-      <ul class="why">
+      <ul class="why" id="whyList">
         <li>
           <span class="rule"></span>
           <p>Last night was 5h42m against a 30-day median of 7h10m.<span class="conf">High</span></p>
@@ -450,6 +482,7 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
 
       <div class="actions">
         <span class="micro">Do today</span>
+        <div id="doToday">
         <div class="action">
           <span class="idx">1</span>
           <span>Keep tonight's lights-out within 30 minutes of your usual time.
@@ -460,16 +493,17 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
           <span>Log the check-in before 07:15.
             <span class="rat">Yesterday's entry arrived late and was flagged.</span></span>
         </div>
+        </div>
       </div>
 
       <div class="verdict">
-        <span class="v">Train light</span>
-        <span class="r">Sleep is short and resting HR is elevated. Keep the session submaximal, or move Pull B to tomorrow.</span>
+        <span class="v" id="verdictWord">Train light</span>
+        <span class="r" id="verdictText">Sleep is short and resting HR is elevated. Keep the session submaximal, or move Pull B to tomorrow.</span>
       </div>
 
       <div class="caveat">
         <span class="bar" aria-hidden="true"></span>
-        <span>Protein unavailable — MyFitnessPal does not sync macros. Nutrition is 45% complete for yesterday.</span>
+        <span id="caveatText">Protein unavailable — MyFitnessPal does not sync macros. Nutrition is 45% complete for yesterday.</span>
       </div>
 
       <div class="feedback">
@@ -483,11 +517,11 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     <section class="card tile span-3" aria-labelledby="t1">
       <div class="head">
         <span class="micro" id="t1">Sleep</span>
-        <span class="delta down">−88 min</span>
+        <span class="delta down" id="sleepDelta">−88 min</span>
       </div>
-      <div class="val">5<small>h</small> 42<small>m</small></div>
+      <div class="val" id="sleepVal">5<small>h</small> 42<small>m</small></div>
       <div class="bars" id="sleepbars">
-        <div class="baseline" style="bottom:89.6%"><span>baseline 7h10m</span></div>
+        <div class="baseline" id="sleepBaseline" style="bottom:89.6%"><span id="sleepBaselineLabel">baseline 7h10m</span></div>
         <div class="bar" style="height:89.2%" data-tip="Fri 29 Aug · 7h08m"></div>
         <div class="bar" style="height:83.5%" data-tip="Sat 30 Aug · 6h41m"></div>
         <div class="bar missing" style="height:100%" data-tip="Sun 31 Aug · no data — watch not worn"></div>
@@ -505,65 +539,65 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     <section class="card tile span-3" aria-labelledby="t2">
       <div class="head">
         <span class="micro" id="t2">Resting HR</span>
-        <span class="delta up">+6 bpm</span>
+        <span class="delta up" id="rhrDelta">+6 bpm</span>
       </div>
-      <div class="val">58<small>bpm</small></div>
+      <div class="val" id="rhrVal">58<small>bpm</small></div>
       <svg class="spark" viewBox="0 0 220 70" role="img"
            aria-label="Resting heart rate over 7 days, rising from 51 to 58 bpm against a 50 to 54 baseline band">
-        <rect x="0" y="32" width="220" height="13.3" fill="var(--accent-soft)"></rect>
-        <line x1="0" y1="38.7" x2="220" y2="38.7" stroke="var(--hairline-2)" stroke-width="1" stroke-dasharray="3 4"></line>
-        <polyline points="10,42 43,35.3 76,38.7 109,32 142,35.3 175,25.3 208,18.7"
+        <rect id="rhrBand" x="0" y="32" width="220" height="13.3" fill="var(--accent-soft)"></rect>
+        <line id="rhrMedian" x1="0" y1="38.7" x2="220" y2="38.7" stroke="var(--hairline-2)" stroke-width="1" stroke-dasharray="3 4"></line>
+        <polyline id="rhrLine" points="10,42 43,35.3 76,38.7 109,32 142,35.3 175,25.3 208,18.7"
                   fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>
-        <circle cx="208" cy="18.7" r="4.5" fill="var(--accent)" stroke="var(--bg)" stroke-width="2"></circle>
-        <text x="0" y="60" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9">51</text>
-        <text x="196" y="60" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9">58</text>
+        <circle id="rhrDot" cx="208" cy="18.7" r="4.5" fill="var(--accent)" stroke="var(--bg)" stroke-width="2"></circle>
+        <text x="0" y="60" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9" id="rhrLo">51</text>
+        <text x="196" y="60" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9" id="rhrHi">58</text>
       </svg>
       <div class="foot">
         <span class="src s-samsung"><i></i>Samsung Health</span>
-        <span class="micro">Median 52</span>
+        <span class="micro" id="rhrFoot">Median 52</span>
       </div>
     </section>
 
     <section class="card tile span-3" aria-labelledby="t3">
       <div class="head">
         <span class="micro" id="t3">Yesterday</span>
-        <span class="delta flat">RPE 8</span>
+        <span class="delta flat" id="trainDelta">RPE 8</span>
       </div>
-      <div class="val" style="font-size:22px">Push A</div>
+      <div class="val" id="trainTitle" style="font-size:22px">Push A</div>
       <div>
-        <span class="micro" style="letter-spacing:.1em">Volume 9,840 kg</span>
+        <span class="micro" id="trainVolume" style="letter-spacing:.1em">Volume 9,840 kg</span>
         <div class="acwr">
           <div class="rail"></div>
           <div class="zone" style="left:20%; width:46.7%"></div>
           <div class="flag" style="left:66.7%"><span>1.5</span></div>
-          <div class="knob" style="left:51.3%"></div>
+          <div class="knob" id="acwrKnob" style="left:51.3%"></div>
         </div>
         <div class="ends">
-          <span class="micro">ACWR 1.27</span>
+          <span class="micro" id="acwrLabel">ACWR 1.27</span>
           <span class="micro">Spike above 1.5</span>
         </div>
       </div>
       <div class="foot">
         <span class="src s-hevy"><i></i>Hevy</span>
-        <span class="micro">4 days since rest</span>
+        <span class="micro" id="trainFoot">4 days since rest</span>
       </div>
     </section>
 
     <section class="card tile span-3" aria-labelledby="t4">
       <div class="head">
         <span class="micro" id="t4">Weight trend</span>
-        <span class="delta ok">−0.24 kg/wk</span>
+        <span class="delta ok" id="weightDelta">−0.24 kg/wk</span>
       </div>
-      <div class="val">84.2<small>kg</small></div>
+      <div class="val" id="weightVal">84.2<small>kg</small></div>
       <svg class="spark" viewBox="0 0 220 70" role="img"
            aria-label="Smoothed weight over 30 days, falling from 85.0 to 84.2 kilograms">
-        <path d="M10,18 L28.2,20.3 L46.4,22 L64.5,24.7 L82.7,27 L100.9,28.7 L119.1,32 L137.3,34.7 L155.5,37 L173.6,40 L191.8,42.7 L210,45.3 L210,58 L10,58 Z"
+        <path id="weightArea" d="M10,18 L28.2,20.3 L46.4,22 L64.5,24.7 L82.7,27 L100.9,28.7 L119.1,32 L137.3,34.7 L155.5,37 L173.6,40 L191.8,42.7 L210,45.3 L210,58 L10,58 Z"
               fill="var(--accent-soft)"></path>
-        <polyline points="10,18 28.2,20.3 46.4,22 64.5,24.7 82.7,27 100.9,28.7 119.1,32 137.3,34.7 155.5,37 173.6,40 191.8,42.7 210,45.3"
+        <polyline id="weightLine" points="10,18 28.2,20.3 46.4,22 64.5,24.7 82.7,27 100.9,28.7 119.1,32 137.3,34.7 155.5,37 173.6,40 191.8,42.7 210,45.3"
                   fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>
-        <circle cx="210" cy="45.3" r="4.5" fill="var(--accent)" stroke="var(--bg)" stroke-width="2"></circle>
-        <text x="0" y="12" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9">85.0</text>
-        <text x="186" y="66" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9">84.2</text>
+        <circle id="weightDot" cx="210" cy="45.3" r="4.5" fill="var(--accent)" stroke="var(--bg)" stroke-width="2"></circle>
+        <text x="0" y="12" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9" id="weightHi">85.0</text>
+        <text x="186" y="66" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9" id="weightLo">84.2</text>
       </svg>
       <div class="foot">
         <span class="src s-withings"><i></i>Withings</span>
@@ -727,20 +761,22 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     });
   });
 
-  // tooltip on the sleep bars
+  // Tooltip on the sleep bars. Delegated, because the bars are rebuilt
+  // whenever the scenario changes and per-element listeners would be lost.
   var tip = document.getElementById('tip');
-  Array.prototype.forEach.call(document.querySelectorAll('[data-tip]'), function(el){
-    function show(e){
-      tip.textContent = el.getAttribute('data-tip');
-      tip.style.opacity = '1';
-      var r = el.getBoundingClientRect();
-      var x = Math.min(window.innerWidth - tip.offsetWidth - 10, Math.max(8, r.left + r.width/2 - tip.offsetWidth/2));
-      tip.style.left = x + 'px';
-      tip.style.top = Math.max(8, r.top - tip.offsetHeight - 8) + 'px';
-    }
-    el.addEventListener('mouseenter', show);
-    el.addEventListener('mousemove', show);
-    el.addEventListener('mouseleave', function(){ tip.style.opacity = '0'; });
+  document.addEventListener('mouseover', function(e){
+    var el = e.target.closest && e.target.closest('[data-tip]');
+    if (!el) return;
+    tip.textContent = el.getAttribute('data-tip');
+    tip.style.opacity = '1';
+    var r = el.getBoundingClientRect();
+    var x = Math.min(window.innerWidth - tip.offsetWidth - 10,
+                     Math.max(8, r.left + r.width / 2 - tip.offsetWidth / 2));
+    tip.style.left = x + 'px';
+    tip.style.top = Math.max(8, r.top - tip.offsetHeight - 8) + 'px';
+  });
+  document.addEventListener('mouseout', function(e){
+    if (e.target.closest && e.target.closest('[data-tip]')) tip.style.opacity = '0';
   });
 
   // readiness roll-up
@@ -765,3 +801,323 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
 </script>
 </body>
 </html>
+
+<script>
+/* ─────────────────────────────────────────────────────────────
+   Scenario switcher.
+
+   The same screen under the four mornings the design has to
+   survive, so the states that are easy to claim and hard to draw
+   — a night the watch was not worn, a day with no score — can be
+   looked at rather than described. Every figure here is shaped
+   like real metrics-engine output: nulls are nulls, and the
+   no-score morning shows a gap where the number would be.
+   ───────────────────────────────────────────────────────────── */
+(function(){
+  var ARC_LENGTH = 477.5;          // 2 * PI * r, r = 76
+  var ARC_SWEEP  = 358.1;          // 270 degrees of it
+  var SLEEP_SCALE_MIN = 480;       // full height of a sleep bar
+  var DAYS = ['Fri 29 Aug','Sat 30 Aug','Sun 31 Aug','Mon 1 Sep','Tue 2 Sep','Wed 3 Sep','Thu 4 Sep'];
+
+  var SCENARIOS = {
+    amber: {
+      completeness: '87% complete',
+      score: 62, status: 'amber', statusWord: 'Amber', glyph: '!',
+      lede: 'Confidence reduced — HRV is unavailable, so its weight was redistributed across sleep and resting heart rate.',
+      contributors: [
+        {name: 'Sleep debt, 14 days', impact: '−18', width: 72},
+        {name: 'Resting HR deviation', impact: '−9', width: 36}
+      ],
+      headline: 'Sleep ran 88 minutes under baseline and resting heart rate is 6 bpm above it.',
+      why: [
+        {obs: 'Last night was 342 minutes against a 30-day median of 430 minutes.', conf: 'High',
+         ev: '342 min · baseline 430 min · efficiency 81%'},
+        {obs: 'Resting heart rate has been above baseline for three consecutive mornings.', conf: 'Medium',
+         ev: '58 bpm · baseline 52 bpm · Δ +6'},
+        {obs: 'Training load is climbing, with four days since the last rest day.', conf: 'Medium',
+         ev: 'ACWR 1.27 · acute 2,140 · chronic 1,680'}
+      ],
+      doToday: [
+        {action: "Keep tonight's lights-out within 30 minutes of your usual time.",
+         rationale: 'Sleep midpoint variance is 74 minutes over the last fortnight.'},
+        {action: 'Log the check-in before 07:15.',
+         rationale: "Yesterday's entry arrived late and was flagged."}
+      ],
+      verdict: 'Train light',
+      verdictText: 'Sleep is short and resting HR is elevated. Keep the session submaximal, or move Pull B to tomorrow.',
+      caveat: 'Protein unavailable — MyFitnessPal does not sync macros. Nutrition is 45% complete for yesterday.',
+      sleep: {nights: [428,401,null,396,447,372,342], baseline: 430, delta: '−88 min', deltaClass: 'down'},
+      rhr: {series: [51,53,52,54,53,56,58], median: 52, delta: '+6 bpm', deltaClass: 'up'},
+      training: {title: 'Push A', rpe: 'RPE 8', volume: 'Volume 9,840 kg', acwr: 1.27, rest: '4 days since rest'},
+      weight: {series: [85.02,84.95,84.9,84.82,84.75,84.7,84.6,84.52,84.45,84.36,84.28,84.2],
+               delta: '−0.24 kg/wk', deltaClass: 'ok'}
+    },
+
+    green: {
+      completeness: '100% complete',
+      score: 94, status: 'green', statusWord: 'Green', glyph: '✓',
+      lede: 'Confidence reduced — HRV is unavailable, so its weight was redistributed across sleep and resting heart rate.',
+      contributors: [
+        {name: 'Sleep debt, 14 days', impact: '−4', width: 22},
+        {name: 'Sleep duration', impact: '−2', width: 11}
+      ],
+      headline: 'Nothing is unusual this morning. Sleep and resting heart rate sit at baseline.',
+      why: [
+        {obs: 'Last night was 448 minutes against a 30-day median of 430 minutes.', conf: 'High',
+         ev: '448 min · baseline 430 min · efficiency 92%'},
+        {obs: 'Resting heart rate is 51 bpm, one below the 30-day median.', conf: 'High',
+         ev: '51 bpm · baseline 52 bpm · Δ −1'}
+      ],
+      doToday: [
+        {action: 'Train as planned.',
+         rationale: 'Nothing in the data argues against the session you had scheduled.'}
+      ],
+      verdict: 'Train hard',
+      verdictText: 'Sleep, resting HR and load are all where they usually are. No reason to hold back.',
+      caveat: 'Protein unavailable — MyFitnessPal does not sync macros.',
+      sleep: {nights: [455,441,430,448,462,437,448], baseline: 430, delta: '+18 min', deltaClass: 'ok'},
+      rhr: {series: [52,51,53,52,51,52,51], median: 52, delta: '−1 bpm', deltaClass: 'ok'},
+      training: {title: 'Pull B', rpe: 'RPE 7', volume: 'Volume 8,420 kg', acwr: 1.05, rest: '1 day since rest'},
+      weight: {series: [84.6,84.58,84.52,84.48,84.44,84.4,84.34,84.3,84.25,84.2,84.15,84.1],
+               delta: '−0.21 kg/wk', deltaClass: 'ok'}
+    },
+
+    red: {
+      completeness: '100% complete',
+      score: 24, status: 'red', statusWord: 'Red', glyph: '!',
+      lede: 'Confidence reduced — HRV is unavailable, so its weight was redistributed across sleep and resting heart rate.',
+      contributors: [
+        {name: 'Resting HR deviation', impact: '−27', width: 90},
+        {name: 'Sleep debt, 14 days', impact: '−18', width: 60}
+      ],
+      headline: 'Resting heart rate has been 8 bpm above baseline for four consecutive mornings.',
+      why: [
+        {obs: 'Resting heart rate is 60 bpm against a 30-day median of 52 bpm.', conf: 'High',
+         ev: '60 bpm · baseline 52 bpm · Δ +8'},
+        {obs: 'Sleep debt has reached 700 minutes across 14 observed nights.', conf: 'High',
+         ev: 'debt 700 min · target 450 min/night · 14 nights observed'},
+        {obs: 'Six days have passed since the last rest day.', conf: 'High',
+         ev: 'ACWR 1.68 · acute 3,120 · chronic 1,860'}
+      ],
+      doToday: [
+        {action: 'Take a rest day.',
+         rationale: 'Six consecutive training days with resting HR 8 bpm above baseline.'},
+        {action: 'Log the check-in.',
+         rationale: 'Subjective scores are the only signal not already flagged this week.'}
+      ],
+      verdict: 'Rest',
+      verdictText: 'A sustained resting HR elevation of this size alongside accumulated sleep debt is worth mentioning to a GP if it continues past a few more days.',
+      caveat: 'Protein unavailable — MyFitnessPal does not sync macros.',
+      sleep: {nights: [402,377,395,368,352,341,358], baseline: 430, delta: '−72 min', deltaClass: 'down'},
+      rhr: {series: [54,55,57,58,59,60,60], median: 52, delta: '+8 bpm', deltaClass: 'up'},
+      training: {title: 'Push A', rpe: 'RPE 9', volume: 'Volume 11,200 kg', acwr: 1.68, rest: '6 days since rest'},
+      weight: {series: [84.4,84.42,84.45,84.47,84.5,84.5,84.52,84.55,84.55,84.58,84.6,84.6],
+               delta: '+0.12 kg/wk', deltaClass: 'flat'}
+    },
+
+    nowatch: {
+      completeness: '43% complete',
+      score: null, status: 'none', statusWord: 'No score', glyph: '—',
+      lede: 'Data completeness is 43%, below the 60% floor. No readiness score for this morning.',
+      contributors: null,
+      headline: 'The watch was not worn last night, so there is no sleep or resting heart rate to report.',
+      why: [
+        {obs: 'Yesterday you rated the day 6 out of 10 and tagged it late screen.', conf: 'Medium',
+         ev: 'overall 6 · energy 3 · stress 4 · tags: late_screen'}
+      ],
+      doToday: [
+        {action: 'Wear the watch tonight.',
+         rationale: 'This is the third unmeasured night in seven; the sleep baseline is close to being flagged as biased.'}
+      ],
+      verdict: 'No recommendation',
+      verdictText: 'Too little was measured overnight to say anything about readiness or training.',
+      caveat: 'Sleep and resting HR unavailable — the watch was not worn. Protein unavailable — MyFitnessPal does not sync macros.',
+      sleep: {nights: [428,401,null,396,447,372,null], baseline: 430, delta: 'no data', deltaClass: 'flat'},
+      rhr: {series: [51,53,52,54,53,56,null], median: 52, delta: 'no data', deltaClass: 'flat'},
+      training: {title: 'Rest day', rpe: '—', volume: 'No session logged', acwr: 1.27, rest: '0 days since rest'},
+      weight: {series: [85.02,84.95,84.9,84.82,84.75,84.7,84.6,84.52,84.45,84.36,84.28,84.2],
+               delta: '−0.24 kg/wk', deltaClass: 'ok'}
+    }
+  };
+
+  var STATUS_COLOUR = {green: 'var(--good)', amber: 'var(--warn)', red: 'var(--crit)', none: 'var(--ink-3)'};
+
+  function $(id){ return document.getElementById(id); }
+  function set(id, text){ var el = $(id); if (el) el.textContent = text; }
+
+  function minutesLabel(mins){
+    return Math.floor(mins / 60) + 'h' + String(mins % 60).padStart(2, '0') + 'm';
+  }
+
+  function renderGauge(s){
+    var arc = $('arc'), track = $('track'), score = $('score');
+    var colour = STATUS_COLOUR[s.status];
+    if (s.score === null){
+      // No score is drawn as an absence, never as a zero. The arc is hidden
+      // outright: a zero-length dash still paints its round cap, which reads
+      // as a tiny score rather than as none.
+      arc.setAttribute('stroke', 'none');
+      arc.setAttribute('stroke-dasharray', '0 ' + ARC_LENGTH);
+      track.setAttribute('stroke-dasharray', '3 9');
+      track.setAttribute('stroke', 'var(--hairline-2)');
+      score.textContent = '—';
+      score.style.color = 'var(--ink-3)';
+      set('scoreUnit', 'no score');
+    } else {
+      arc.setAttribute('stroke', colour);
+      arc.setAttribute('stroke-dasharray', (ARC_SWEEP * s.score / 100).toFixed(1) + ' ' + ARC_LENGTH);
+      track.setAttribute('stroke-dasharray', ARC_SWEEP + ' ' + ARC_LENGTH);
+      track.setAttribute('stroke', 'var(--surface-2)');
+      score.textContent = s.score;
+      score.style.color = 'var(--ink)';
+      set('scoreUnit', 'of 100');
+    }
+    $('statusBlock').className = 'st-' + s.status;
+    set('statusGlyph', s.glyph);
+    set('statusName', s.statusWord);
+    set('lede', s.lede);
+  }
+
+  function renderContributors(s){
+    var host = $('contribRows');
+    if (!host) return;
+    if (!s.contributors){
+      host.innerHTML = '<p class="defn" style="margin:0">No components to rank — the day was not measured well enough to score.</p>';
+      return;
+    }
+    host.innerHTML = s.contributors.map(function(c){
+      return '<div class="contrib"><span class="name">' + c.name + '</span>' +
+             '<span class="impact">' + c.impact + '</span>' +
+             '<span class="track"><span class="fill" style="width:' + c.width + '%"></span></span></div>';
+    }).join('');
+  }
+
+  function renderBrief(s){
+    set('briefHeadline', s.headline);
+    $('whyList').innerHTML = s.why.map(function(w){
+      return '<li><span class="rule"></span><p>' + w.obs +
+             '<span class="conf">' + w.conf + '</span></p>' +
+             '<p class="ev">' + w.ev + '</p></li>';
+    }).join('');
+    $('doToday').innerHTML = s.doToday.map(function(a, i){
+      return '<div class="action"><span class="idx">' + (i + 1) + '</span><span>' + a.action +
+             '<span class="rat">' + a.rationale + '</span></span></div>';
+    }).join('');
+    set('verdictWord', s.verdict);
+    set('verdictText', s.verdictText);
+    set('caveatText', s.caveat);
+  }
+
+  function renderSleep(s){
+    var bars = $('sleepbars');
+    var last = s.sleep.nights[s.sleep.nights.length - 1];
+    $('sleepVal').innerHTML = last === null
+      ? '—'
+      : Math.floor(last / 60) + '<small>h</small> ' + (last % 60) + '<small>m</small>';
+    var delta = $('sleepDelta');
+    delta.textContent = s.sleep.delta;
+    delta.className = 'delta ' + s.sleep.deltaClass;
+
+    Array.prototype.slice.call(bars.querySelectorAll('.bar')).forEach(function(el){ el.remove(); });
+    s.sleep.nights.forEach(function(mins, i){
+      var bar = document.createElement('div');
+      var isLast = i === s.sleep.nights.length - 1;
+      if (mins === null){
+        // A night that was not measured, drawn as a gap rather than a low bar.
+        bar.className = 'bar missing';
+        bar.style.height = '100%';
+        bar.setAttribute('data-tip', DAYS[i] + ' · no data — watch not worn');
+      } else {
+        bar.className = 'bar' + (isLast ? ' last' : '');
+        bar.style.height = (100 * mins / SLEEP_SCALE_MIN).toFixed(1) + '%';
+        bar.setAttribute('data-tip', DAYS[i] + ' · ' + minutesLabel(mins));
+      }
+      bars.appendChild(bar);
+    });
+    $('sleepBaseline').style.bottom = (100 * s.sleep.baseline / SLEEP_SCALE_MIN).toFixed(1) + '%';
+    set('sleepBaselineLabel', 'baseline ' + minutesLabel(s.sleep.baseline));
+  }
+
+  function renderRhr(s){
+    var vals = s.rhr.series;
+    var observed = vals.filter(function(v){ return v !== null; });
+    var lo = Math.min.apply(null, observed.concat([s.rhr.median])) - 2;
+    var hi = Math.max.apply(null, observed.concat([s.rhr.median])) + 2;
+    var y = function(v){ return 52 - ((v - lo) / (hi - lo)) * 40; };
+    var pts = [];
+    vals.forEach(function(v, i){ if (v !== null) pts.push((10 + i * 33) + ',' + y(v).toFixed(1)); });
+
+    $('rhrLine').setAttribute('points', pts.join(' '));
+    var lastIndex = -1;
+    vals.forEach(function(v, i){ if (v !== null) lastIndex = i; });
+    var dot = $('rhrDot');
+    dot.setAttribute('cx', 10 + lastIndex * 33);
+    dot.setAttribute('cy', y(vals[lastIndex]).toFixed(1));
+
+    $('rhrBand').setAttribute('y', y(s.rhr.median + 2).toFixed(1));
+    $('rhrBand').setAttribute('height', (y(s.rhr.median - 2) - y(s.rhr.median + 2)).toFixed(1));
+    $('rhrMedian').setAttribute('y1', y(s.rhr.median).toFixed(1));
+    $('rhrMedian').setAttribute('y2', y(s.rhr.median).toFixed(1));
+
+    var today = vals[vals.length - 1];
+    $('rhrVal').innerHTML = today === null ? '—' : today + '<small>bpm</small>';
+    var delta = $('rhrDelta');
+    delta.textContent = s.rhr.delta;
+    delta.className = 'delta ' + s.rhr.deltaClass;
+    set('rhrLo', observed[0]);
+    set('rhrHi', observed[observed.length - 1]);
+    set('rhrFoot', 'Median ' + s.rhr.median);
+  }
+
+  function renderTraining(s){
+    set('trainTitle', s.training.title);
+    set('trainDelta', s.training.rpe);
+    set('trainVolume', s.training.volume);
+    set('trainFoot', s.training.rest);
+    set('acwrLabel', 'ACWR ' + s.training.acwr.toFixed(2));
+    // The rail runs 0.5 to 2.0; the flag sits at the 1.5 spike threshold.
+    $('acwrKnob').style.left = (100 * (s.training.acwr - 0.5) / 1.5).toFixed(1) + '%';
+  }
+
+  function renderWeight(s){
+    var vals = s.weight.series;
+    var lo = Math.min.apply(null, vals) - 0.15;
+    var hi = Math.max.apply(null, vals) + 0.15;
+    var y = function(v){ return 52 - ((v - lo) / (hi - lo)) * 40; };
+    var step = 200 / (vals.length - 1);
+    var pts = vals.map(function(v, i){ return (10 + i * step).toFixed(1) + ',' + y(v).toFixed(1); });
+
+    $('weightLine').setAttribute('points', pts.join(' '));
+    $('weightArea').setAttribute('d', 'M' + pts.join(' L') + ' L210,58 L10,58 Z');
+    $('weightDot').setAttribute('cy', y(vals[vals.length - 1]).toFixed(1));
+    $('weightVal').innerHTML = vals[vals.length - 1].toFixed(1) + '<small>kg</small>';
+    var delta = $('weightDelta');
+    delta.textContent = s.weight.delta;
+    delta.className = 'delta ' + s.weight.deltaClass;
+    set('weightHi', vals[0].toFixed(1));
+    set('weightLo', vals[vals.length - 1].toFixed(1));
+  }
+
+  function render(key){
+    var s = SCENARIOS[key];
+    if (!s) return;
+    set('completeness', s.completeness);
+    renderGauge(s);
+    renderContributors(s);
+    renderBrief(s);
+    renderSleep(s);
+    renderRhr(s);
+    renderTraining(s);
+    renderWeight(s);
+    Array.prototype.forEach.call(document.querySelectorAll('.scenario'), function(b){
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-scenario') === key));
+    });
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('.scenario'), function(b){
+    b.addEventListener('click', function(){ render(b.getAttribute('data-scenario')); });
+  });
+
+  render('amber');   // render rather than trust the markup, so the two cannot drift
+})();
+</script>
