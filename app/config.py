@@ -1,14 +1,21 @@
 """Application settings. Everything secret comes from the environment."""
 
+import os
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.metrics.readiness import ReadinessWeights
 
+#: Which dotenv file to read, if any. The tests set this to empty so a
+#: developer's real `.env` cannot change what the suite asserts — without it,
+#: adding a live HEVY_API_KEY locally turns "this source is unconfigured"
+#: tests red on that machine and nowhere else.
+ENV_FILE = os.getenv("ENV_FILE", ".env") or None
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore")
 
     # Core
     database_url: str = "sqlite+pysqlite:///./health.db"
