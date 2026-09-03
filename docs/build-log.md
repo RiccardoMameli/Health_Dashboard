@@ -29,6 +29,13 @@ Two bugs found by rendering the states rather than reasoning about them:
    the no-score gauge that read as a very low score. The arc is now hidden
    outright when there is nothing to draw.
 
+And one found by running the suite on a machine that finally had a real key in
+`.env`: **the tests were not hermetic.** `Settings` reads `.env`, so a live
+`HEVY_API_KEY` turned two "this source is unconfigured" assertions red locally
+and nowhere else — CI has no `.env` and stayed green. The dotenv path is now
+`ENV_FILE`, which `conftest.py` sets to empty. Verified both ways: 126 pass
+with a populated `.env` present and with none at all.
+
 ---
 
 ## 3 September 2026 — Phase 2: metrics engine, readiness, the brief
