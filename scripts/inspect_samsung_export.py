@@ -30,17 +30,24 @@ from pathlib import Path
 #: prefixes with a package name and suffixes with a timestamp.
 INTERESTING = [
     ("sleep", "sleep — the backbone of the whole system"),
-    ("heart_rate", "heart rate, including resting HR"),
+    ("hrv", "heart rate variability — readiness has a fuller formula when this exists"),
+    ("heart_rate", "heart rate; resting HR has to be derived from it"),
     ("pedometer", "steps"),
     ("step_count", "steps"),
+    ("step_daily_trend", "steps, daily"),
     ("floors", "stairs climbed"),
-    ("exercise", "workouts (Hevy is the source of truth; useful for cardio)"),
-    ("weight", "weight, if the scale ever wrote here"),
+    ("respiratory_rate", "respiratory rate"),
+    ("skin_temperature", "skin temperature"),
+    ("oxygen", "SpO2"),
+    ("stress", "stress"),
+    ("weight", "weight and body composition"),
     ("body_composition", "body composition"),
+    ("activity.day_summary", "daily activity summary"),
+    ("calories_burned", "calories out"),
     ("food", "nutrition"),
     ("nutrition", "nutrition"),
-    ("stress", "stress"),
-    ("oxygen", "SpO2"),
+    ("exercise", "workouts (Hevy is the source of truth; useful for cardio)"),
+    ("user_profile", "height, age and sex, which some metrics need"),
 ]
 
 #: Samsung writes a metadata line above the real header on most exports. Reading
@@ -107,7 +114,21 @@ def describe(name: str, raw: bytes, why: str, full_rows: bool) -> None:
     if header_line:
         print(f"  ! the real header is on line {header_line + 1}, not line 1")
         print(f"    line 1 reads: {lines[0][:90]!r}")
-    print(f"  {len(columns)} columns:")
+    # Date coverage, from whichever time column the file happens to use.
+    for candidate in ("start_time", "day_time", "create_time",
+                      "com.samsung.health.sleep.start_time",
+                      "com.samsung.health.heart_rate.start_time",
+                      "com.samsung.health.step_count.start_time"):
+        if candidate in columns:
+            at = columns.index(candidate)
+            stamps = sorted(r[at].strip() for r in body if at < len(r) and r[at].strip())
+            if stamps:
+                print(f"  {candidate}: {stamps[0][:10]} to {stamps[-1][:10]}")
+            break
+
+    print(f"  {len(columns)} columns"
+          " (one example each, taken from the first row that populates it —")
+    print("   so values on different lines below may come from different records):")
     samples = example_values(body[:200], columns)
     for column in columns:
         value = samples.get(column, "(never populated in the first 200 rows)")
