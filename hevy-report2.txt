@@ -1,0 +1,278 @@
+﻿=== fetching ===
+
+  fetched page 1 (10 workouts)
+  fetched page 2 (20 workouts)
+  fetched page 3 (30 workouts)
+  fetched page 4 (40 workouts)
+  fetched page 5 (50 workouts)
+  fetched page 6 (60 workouts)
+  fetched page 7 (70 workouts)
+  fetched page 8 (80 workouts)
+  fetched page 9 (90 workouts)
+  fetched page 10 (100 workouts)
+  fetched page 11 (110 workouts)
+  fetched page 12 (120 workouts)
+  fetched page 13 (130 workouts)
+  fetched page 14 (140 workouts)
+  fetched page 15 (150 workouts)
+  fetched page 16 (160 workouts)
+  fetched page 17 (170 workouts)
+  fetched page 18 (180 workouts)
+  fetched page 19 (190 workouts)
+  fetched page 20 (200 workouts)
+  fetched page 21 (210 workouts)
+  fetched page 22 (220 workouts)
+  fetched page 23 (230 workouts)
+  fetched page 24 (240 workouts)
+  fetched page 25 (250 workouts)
+  fetched page 26 (260 workouts)
+  fetched page 27 (270 workouts)
+  fetched page 28 (274 workouts)
+
+========================================================================
+SUMMARY
+========================================================================
+  workouts fetched          : 274
+  /v1/workouts/count says   : 274
+  date range (local)        : 2023-07-31 to 2026-09-08  (1136 days)
+  distinct training days    : 274
+  duplicate ids             : none
+
+--- one full raw payload, exactly as the API sent it ---
+{
+  "id": "27be66c4-dc76-4075-8268-150b99a07cf2",
+  "title": "Upper body",
+  "routine_id": null,
+  "description": "",
+  "start_time": "2026-09-08T19:28:37+00:00",
+  "end_time": "2026-09-08T20:07:42+00:00",
+  "updated_at": "2026-09-08T20:07:46.894Z",
+  "created_at": "2026-09-08T20:07:46.894Z",
+  "exercises": [
+    {
+      "index": 0,
+      "title": "Chest Press (Machine)",
+      "notes": "",
+      "exercise_template_id": "7EB3F7C3",
+      "superset_id": null,
+      "sets": [
+        {
+          "index": 0,
+          "type": "normal",
+          "weight_kg": 80,
+          "reps": 10,
+          "distance_meters": null,
+          "duration_seconds": null,
+          "rpe": null,
+          "custom_metric": null
+        },
+        {
+          "index": 1,
+          "type": "normal",
+          "weight_kg": 82,
+          "reps": 10,
+          "distance_meters": null,
+          "duration_seconds": null,
+          "rpe": null,
+          "custom_metric": null
+        },
+        {
+          "index": 2,
+          "type": "normal",
+          "weight_kg": 82,
+          "reps": 8,
+          "distance_meters": null,
+          "duration_seconds": null,
+          "rpe": null,
+          "custom_metric": null
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "title": "Lat Pulldown (Cable)",
+      "notes": "",
+      "exercise_template_id": "6A6C31A5",
+      "superset_id": null,
+      "sets": [
+        {
+          "index": 0,
+          "type": "normal",
+          "weight_kg": 61,
+          "reps": 10,
+          "distance_meters": null,
+          "duration_seconds": null,
+          "rpe": null,
+          "custom_metric": null
+        },
+        {
+          "index": 1,
+          "type": "normal",
+          "weight_kg": 61,
+          "reps": 10,
+          "distance_meters": null,
+          "duration_seconds": null,
+          "rpe": null,
+          "custom_metric": null
+        },
+        {
+          "index": 2,
+          "type": "normal",
+          "weight_kg": 61,
+          "reps": 8,
+          "distance_meters": null,
+          "duration_seconds": null,
+          "rpe": null,
+          "custom_metric": null
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "title": "Seated Lateral Raise (Dumbbell)",
+      "notes": "",
+      "exercise_template_id": "9372FFAA",
+      "superset_id": null,
+      "sets": [
+        {
+          "index": 0,
+          "type": "normal",
+          "weight_kg": 10,
+          "reps": 24,
+          "distance_meters": null,
+          "duration_seconds": null,
+          "rpe": null,
+          "custom_metric": null
+        },
+        {
+          "index": 1,
+          "type": "normal",
+          "weight_kg": 10,
+          "reps": 24,
+          "distance_meters": null,
+          "duration_seconds": null,
+          "rpe": null,
+          "custom_metric": null
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "title": "Chest Dip",
+      "notes": "",
+      "exercise_template_id": "6FCD7755",
+      "superset_id": null,
+      "sets": [
+        {
+          "index": 0,
+          "type": "normal",
+          "weight_kg": null,
+          "reps": 15,
+          "distance_meters": null,
+          "duration_seconds": null,
+          "rpe": null,
+          "custom_metric": null
+        },
+        {
+          "index": 1,
+          "type": "normal",
+          "weight_kg": null,
+          "reps": 15,
+          "distance_meters": null,
+          "duration_seconds": null,
+          "rpe": null,
+          "custom_metric": null
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "title": "Hammer Curl (Dumbbell)",
+      "notes": "",
+      "exercise_template_id": "7E3BC8B6",
+      "superset_id": null,
+      "sets": [
+        {
+          "index": 0,
+          "type": "normal",
+          "weight_kg": 14,
+          "reps": 20,
+          "distance_meters": null,
+          "duration_seconds": null,
+          "rpe": null,
+          "custom_metric": null
+        },
+        {
+          "index": 1,
+          "type": "normal",
+          "weight_kg": 14,
+          "reps": 20,
+          "distance_meters": null,
+          "duration_seconds": null,
+          "rpe": null,
+          "custom_metric": null
+        }
+      ]
+    }
+  ]
+}
+
+--- fields the adapter reads ---
+  all present on every record
+
+--- fields the API sends that the adapter does not normalise ---
+  (retained in raw_records, never in a typed column)
+  set.custom_metric  (4331)
+  exercise.index  (1442)
+  exercise.notes  (1442)
+  exercise.superset_id  (1442)
+  workout.routine_id  (274)
+  workout.updated_at  (274)
+  workout.created_at  (274)
+
+--- observed types ---
+  weight_kg: {'int': 3191, 'NoneType': 463, 'float': 677}
+  reps: {'int': 4300, 'NoneType': 31}
+  rpe: {'NoneType': 4331}
+
+--- set types ---
+  normal       4317  counted toward volume
+  warmup         14  excluded from volume
+
+--- volume hand-check ---
+  workout d98bc0a4-8265-4d00-bc47-9417347aeb4c  'Legs'  2026-04-07T18:00:01+00:00
+    warmup   Leg Extension (Machine)      50 x 10 =    500.00   EXCLUDED
+    normal   Leg Extension (Machine)      86 x 10 =    860.00
+    normal   Leg Extension (Machine)      86 x 10 =    860.00
+    normal   Leg Extension (Machine)      86 x 10 =    860.00
+    normal   Leg Press Horizontal (Machin 198 x 10 =   1980.00
+    normal   Leg Press Horizontal (Machin 200 x 10 =   2000.00
+    normal   Leg Press Horizontal (Machin 200 x 10 =   2000.00
+    normal   Crunch (Machine)             61 x 10 =    610.00
+    normal   Crunch (Machine)             62 x 10 =    620.00
+    normal   Calf Press (Machine)         140 x 25 =   3500.00
+    normal   Calf Press (Machine)         140 x 25 =   3500.00
+    normal   Calf Press (Machine)         140 x 25 =   3500.00
+
+  by hand (working sets only) : 20290.0
+  adapter _volume_kg()        : 20290.0
+  warm-up volume excluded     : 500.0
+  MATCH: True
+
+--- date attribution ---
+  rule: local_date(start_at) ÔÇö the day the session BEGAN
+
+  4 workout(s) starting 22:00-04:00 local:
+    bcd3279d-3bd4-408c-9f26-57b13fc407dd  start 2024-05-31T22:43:38+01:00  -> attributed 2024-05-31
+    6116f5cd-a014-46fc-80b3-7d070e137560  start 2024-05-17T22:34:55+01:00  -> attributed 2024-05-17
+    b23bb6bb-56f5-4b95-9945-8e0fff9ad726  start 2024-04-06T22:20:28+01:00  -> attributed 2024-04-06
+    80fac7e3-1fcb-404e-b3cc-4cd0ca83707a  start 2024-03-01T23:16:44+00:00  -> attributed 2024-03-01
+  none spanning local midnight
+
+  local UTC offsets seen: {'+0100': 163, '+0000': 111}
+
+--- fixture written ---
+  C:\Users\ricky\Documents\GitHub\Health_Dashboard\tests\fixtures\hevy_workouts.json
+  274 workouts, 279 identifiers replaced
+  titles renamed, descriptions and exercise notes redacted
+  timestamps, weights, reps and RPE kept ÔÇö read it before committing
