@@ -223,3 +223,31 @@ def test_sync_failure_is_recorded_as_a_failed_run(client, auth):
         run = session.execute(select(SyncRun)).scalar_one()
         assert run.status == "failed"
         assert "HEVY_API_KEY" in run.error_message
+
+
+# --- the Today screen, served from the API that feeds it ---------------------
+
+
+def test_ui_route_serves_the_today_screen(client):
+    """The page itself is unauthenticated — it is markup. What it displays
+    comes from /today, which is not."""
+    response = client.get("/ui")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    body = response.text
+    assert "Readiness" in body
+    # The four designed mornings and the real one are rendered by the same
+    # code path, which is what stops the reference and the live view drifting.
+    for scenario in ("amber", "green", "red", "nowatch", "live"):
+        assert f'data-scenario="{scenario}"' in body
+
+
+def test_ui_route_is_not_cached(client):
+    """The file is hand-edited during design work; a cached copy of
+    yesterday's layout is a confusing thing to debug."""
+    assert client.get("/ui").headers["cache-control"] == "no-store"
+
+
+def test_today_still_requires_a_token(client):
+    """The page being open must not make the data open."""
+    assert client.get("/api/v1/today").status_code == 401

@@ -5,7 +5,14 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import routes_brief, routes_checkin, routes_data, routes_supplements, routes_sync
+from app.api import (
+    routes_brief,
+    routes_checkin,
+    routes_data,
+    routes_supplements,
+    routes_sync,
+    routes_ui,
+)
 from app.config import get_settings
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -35,6 +42,9 @@ app.include_router(routes_sync.public, prefix=API_PREFIX)
 app.include_router(routes_data.router, prefix=API_PREFIX)
 app.include_router(routes_brief.router, prefix=API_PREFIX)
 app.include_router(routes_brief.metrics_router, prefix=API_PREFIX)
+
+# Not under the API prefix: this is a page, not an endpoint.
+app.include_router(routes_ui.router)
 
 
 @app.get("/health", tags=["ops"])
