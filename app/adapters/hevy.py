@@ -41,13 +41,22 @@ def _parse_dt(value: str | None) -> datetime | None:
     return to_utc(datetime.fromisoformat(value.replace("Z", "+00:00")))
 
 
-def _volume_kg(sets: list[dict[str, Any]]) -> float:
+def _volume_kg(sets: list[dict[str, Any]]) -> float | None:
     """Volume load = sum(weight x reps), warm-up sets excluded.
 
     Warm-ups are excluded deliberately: including them makes a deload week
     with long warm-ups look like a hard week.
+
+    Returns None — not 0.0 — when no working set carries both a weight and
+    reps. Bodyweight work (dips, pull-ups) and timed work record `weight_kg`
+    as null, and 11% of the real history's sets are of that shape. A session
+    made only of them has an *unknown* volume, not a zero one, and the
+    difference matters: `session_load` withholds a load it cannot compute,
+    but a 0.0 flows straight through into the chronic-load window and makes
+    a session that happened indistinguishable from a rest day.
     """
     total = 0.0
+    counted = 0
     for s in sets:
         if (s.get("type") or "normal") == "warmup":
             continue
@@ -55,7 +64,47 @@ def _volume_kg(sets: list[dict[str, Any]]) -> float:
         reps = s.get("reps")
         if weight is not None and reps is not None:
             total += float(weight) * int(reps)
+            counted += 1
+    if counted == 0:
+        return None
     return round(total, 2)
+
+
+def _session_rpe(sets: list[dict[str, Any]]) -> float | None:
+    """One RPE for the session: the mean of the working sets that carry one.
+
+    Hevy records RPE per set, but `session_load` wants a single session
+    rating. The mean of working sets is the owner's chosen convention (10 Sep
+    2026); warm-ups are excluded for the same reason they are excluded from
+    volume — a light warm-up would drag the session's rating down.
+
+    This is not Foster's sRPE, which is one whole-session rating given after
+    the fact. It is close enough to drive the same formula and is what the
+    data actually supports.
+
+    None when no set carries an RPE, which is the whole history before
+    September 2026 — logging started only once this gap was found.
+    """
+    values = [
+        float(s["rpe"])
+        for s in sets
+        if (s.get("type") or "normal") != "warmup" and s.get("rpe") is not None
+    ]
+    if not values:
+        return None
+    return round(sum(values) / len(values), 2)
+
+
+def _blank_to_none(value: Any) -> Any:
+    """Hevy sends "" for an unset description or note, never null.
+
+    An empty string is not a value the user supplied, and storing one would
+    put a falsy non-null into a column the rest of the system reads as
+    "present". A null is a null.
+    """
+    if isinstance(value, str) and not value.strip():
+        return None
+    return value
 
 
 class HevyClient:
@@ -223,9 +272,10 @@ class HevyAdapter(Adapter):
             "end_at": end_at,
             "type": "strength",
             "duration_min": duration_min,
-            "title": raw.get("title"),
-            "notes": raw.get("description"),
+            "title": _blank_to_none(raw.get("title")),
+            "notes": _blank_to_none(raw.get("description")),
             "total_volume_kg": _volume_kg(flat_sets),
+            "perceived_exertion_1_10": _session_rpe(flat_sets),
             "set_count": len([s for s in flat_sets if s["type"] != "warmup"]),
         }
 
