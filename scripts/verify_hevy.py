@@ -282,6 +282,133 @@ def summarise(workouts: list[dict], declared: int | None) -> None:
         print(f"  ! ids that are not UUIDs  : {no_uuid[:5]}")
 
 
+def check_load_quantifiability(workouts: list[dict]) -> None:
+    """How many real sessions the training-load metric cannot see.
+
+    `session_load` prefers duration x RPE and falls back to volume load. A
+    session with neither is meant to report None — "unquantifiable" — rather
+    than zero, because a zero is indistinguishable from a rest day and a rest
+    day is what the chronic-load window will treat it as.
+
+    `_volume_kg` returns 0.0 rather than None when nothing countable is in the
+    session, which defeats that guard. This counts how often that actually
+    happens rather than arguing about whether it could.
+    """
+    zero_volume: list[tuple[dict, float]] = []
+    partial = 0
+    any_rpe = 0
+    for w in workouts:
+        sets = [s for ex in w.get("exercises") or [] for s in ex.get("sets") or []]
+        working = [s for s in sets if (s.get("type") or "normal") != "warmup"]
+        countable = [
+            s for s in working if s.get("weight_kg") is not None and s.get("reps") is not None
+        ]
+        if any(s.get("rpe") is not None for s in sets):
+            any_rpe += 1
+        volume = _volume_kg(
+            [
+                {"type": s.get("type") or "normal", "weight_kg": s.get("weight_kg"),
+                 "reps": s.get("reps")}
+                for s in sets
+            ]
+        )
+        if working and not countable:
+            zero_volume.append((w, volume))
+        elif len(countable) < len(working):
+            partial += 1
+
+    print("\n--- can training load actually see these sessions? ---")
+    print(f"  workouts with ANY set carrying an RPE : {any_rpe} of {len(workouts)}")
+    if any_rpe == 0:
+        print("    -> session_load's primary 'duration x RPE' branch can NEVER fire.")
+        print("       Every session's load comes from the volume fallback.")
+    print(f"  workouts with SOME unweighted sets    : {partial}"
+          f"   (volume undercounts these)")
+    print(f"  workouts with NO countable set at all : {len(zero_volume)}")
+    if zero_volume:
+        print("    -> these record total_volume_kg = 0.0, so session_load returns 0.0.")
+        print("       A session that happened counts as a rest day. Examples:")
+        for w, vol in zero_volume[:10]:
+            start = w.get("start_time", "")[:16]
+            n = sum(len(ex.get("sets") or []) for ex in w.get("exercises") or [])
+            print(f"       {start}  {n:3} sets  volume={vol}  {w.get('id')}")
+    else:
+        print("    -> none. Every session has at least one weight x reps set,")
+        print("       so the zero-load case does not arise in this history.")
+
+
+def select_fixture_sample(workouts: list[dict], limit: int) -> list[dict]:
+    """Pick a handful of workouts that between them exercise the awkward cases.
+
+    A fixture of the entire history is unreviewable, and one specimen is how
+    the hand-written fixture came to miss bodyweight sets and float weights.
+    So: deliberately choose one of each shape the adapter has to survive, then
+    fill up with ordinary sessions.
+    """
+    def sets_of(w: dict) -> list[dict]:
+        return [s for ex in w.get("exercises") or [] for s in ex.get("sets") or []]
+
+    def has_warmup(w: dict) -> bool:
+        return any((s.get("type") or "normal") == "warmup" for s in sets_of(w))
+
+    def has_unweighted(w: dict) -> bool:
+        return any(
+            s.get("weight_kg") is None and s.get("reps") is not None for s in sets_of(w)
+        )
+
+    def has_float_weight(w: dict) -> bool:
+        return any(isinstance(s.get("weight_kg"), float) for s in sets_of(w))
+
+    def near_midnight(w: dict) -> bool:
+        raw = w.get("start_time")
+        if not raw:
+            return False
+        h = to_local(to_utc(datetime.fromisoformat(raw.replace("Z", "+00:00")))).hour
+        return h >= 22 or h < 4
+
+    def offset_of(w: dict) -> str:
+        raw = w.get("start_time")
+        if not raw:
+            return ""
+        return to_local(to_utc(datetime.fromisoformat(raw.replace("Z", "+00:00")))).strftime("%z")
+
+    wanted = [
+        ("a warm-up set, so the exclusion is testable", has_warmup),
+        ("an unweighted (bodyweight) set", has_unweighted),
+        ("a fractional weight", has_float_weight),
+        ("a start near local midnight", near_midnight),
+        ("a GMT (winter) session", lambda w: offset_of(w) == "+0000"),
+        ("a BST (summer) session", lambda w: offset_of(w) == "+0100"),
+    ]
+
+    chosen: list[dict] = []
+    seen: set[str] = set()
+    print("\n--- fixture sample ---")
+    for why, predicate in wanted:
+        if len(chosen) >= limit:
+            break
+        pick = next((w for w in workouts if predicate(w) and w.get("id") not in seen), None)
+        if pick is None:
+            # Distinguish "the history has none" from "an earlier pick already
+            # covers it" — reporting the second as MISSING would wrongly say
+            # the account has no winter sessions when one is already included.
+            if any(predicate(w) for w in workouts):
+                print(f"  covered  {why}  (an already-chosen workout has one)")
+            else:
+                print(f"  MISSING  {why}  -- no workout in this history has one")
+            continue
+        chosen.append(pick)
+        seen.add(pick["id"])
+        print(f"  included {why}")
+    for w in workouts:  # top up with ordinary sessions, newest first
+        if len(chosen) >= limit:
+            break
+        if w.get("id") not in seen:
+            chosen.append(w)
+            seen.add(w["id"])
+    return chosen
+
+
 def scrub(workouts: list[dict]) -> tuple[list[dict], dict[str, str]]:
     """Make a real response committable.
 
@@ -327,6 +454,12 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--pages", type=int, default=None, help="stop after N pages")
     parser.add_argument("--write-fixture", action="store_true")
+    parser.add_argument(
+        "--fixture-sample",
+        type=int,
+        default=8,
+        help="how many workouts to keep in the fixture (0 = the whole history)",
+    )
     parser.add_argument("--show-raw", type=int, default=1, help="how many full payloads to print")
     args = parser.parse_args()
 
@@ -348,11 +481,17 @@ def main() -> int:
         print(json.dumps(w, indent=2))
 
     check_fields(workouts)
+    check_load_quantifiability(workouts)
     hand_verify_volume(workouts)
     check_date_attribution(workouts)
 
     if args.write_fixture:
-        scrubbed, mapping = scrub(workouts)
+        sample = (
+            select_fixture_sample(workouts, args.fixture_sample)
+            if args.fixture_sample
+            else workouts
+        )
+        scrubbed, mapping = scrub(sample)
         payload = {"page": 1, "page_count": 1, "workouts": scrubbed}
         FIXTURE.write_text(json.dumps(payload, indent=2) + "\n")
         print(f"\n--- fixture written ---\n  {FIXTURE}")
