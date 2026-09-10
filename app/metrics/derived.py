@@ -40,6 +40,12 @@ MIN_DAYS_FOR_ACWR = 21
 #: the ratio meaning anything.
 MIN_TRAINING_DAYS_FOR_ACWR = 8
 
+#: How a session's load was arrived at. Both are "load", but they are not the
+#: same quantity and the scaling between them is a heuristic, so a window that
+#: mixes them cannot be compared against itself — see `acwr`.
+LOAD_BASIS_RPE = "duration_rpe"
+LOAD_BASIS_VOLUME = "volume"
+
 #: ACWR below this is unpenalised; the penalty ramps to 1.0 at the ceiling.
 ACWR_PENALTY_FLOOR = 1.3
 ACWR_PENALTY_CEILING = 1.8
@@ -99,6 +105,34 @@ def sleep_midpoint_variance(
     return _stdev(observed)
 
 
+def session_load_and_basis(
+    *,
+    duration_min: float | None,
+    rpe: float | None,
+    volume_kg: float | None = None,
+    volume_kg_per_load_unit: float = VOLUME_KG_PER_LOAD_UNIT,
+) -> tuple[float | None, str | None]:
+    """Load for one session, and which definition produced it.
+
+    Duration x RPE is the primary definition and applies to any modality.
+    Volume-load is used only when RPE was not recorded, scaled into the same
+    rough range. Returns None when the session supports neither — an
+    unquantifiable session must not silently count as zero load.
+
+    The basis is returned because the two are not interchangeable. On real
+    data the same session can read ~1.6x under one and ~6x under the other,
+    depending on whether it was heavy compound work (volume flatters it) or
+    accessory and bodyweight work (volume barely sees it). Anything comparing
+    one window of load against another has to know whether it is comparing
+    like with like.
+    """
+    if duration_min is not None and rpe is not None:
+        return duration_min * rpe, LOAD_BASIS_RPE
+    if volume_kg is not None and volume_kg_per_load_unit > 0:
+        return volume_kg / volume_kg_per_load_unit, LOAD_BASIS_VOLUME
+    return None, None
+
+
 def session_load(
     *,
     duration_min: float | None,
@@ -106,18 +140,13 @@ def session_load(
     volume_kg: float | None = None,
     volume_kg_per_load_unit: float = VOLUME_KG_PER_LOAD_UNIT,
 ) -> float | None:
-    """Load for one session: duration x RPE, or volume-load as a fallback.
-
-    Duration x RPE is the primary definition and applies to any modality.
-    Volume-load is used only when RPE was not recorded, scaled into the same
-    rough range. Returns None when the session supports neither — an
-    unquantifiable session must not silently count as zero load.
-    """
-    if duration_min is not None and rpe is not None:
-        return duration_min * rpe
-    if volume_kg is not None and volume_kg_per_load_unit > 0:
-        return volume_kg / volume_kg_per_load_unit
-    return None
+    """Load for one session: duration x RPE, or volume-load as a fallback."""
+    return session_load_and_basis(
+        duration_min=duration_min,
+        rpe=rpe,
+        volume_kg=volume_kg,
+        volume_kg_per_load_unit=volume_kg_per_load_unit,
+    )[0]
 
 
 def daily_load(session_loads: Sequence[float | None]) -> float:
@@ -138,6 +167,7 @@ def chronic_load(daily_loads: Sequence[float], *, window: int = CHRONIC_WINDOW_D
 def acwr(
     daily_loads: Sequence[float],
     *,
+    daily_bases: Sequence[set[str]] | None = None,
     min_days: int = MIN_DAYS_FOR_ACWR,
     min_training_days: int = MIN_TRAINING_DAYS_FOR_ACWR,
 ) -> float | None:
@@ -148,12 +178,33 @@ def acwr(
     not an infinite spike, it is an unanswerable question. Reporting a
     spurious 4.0 to the brief would be worse than reporting nothing, because
     the brief would then have to explain it.
+
+    Also None when the chronic window mixes load definitions. This is not
+    hypothetical: the account's first three years carry no RPE at all, so
+    every session's load came from volume. The day RPE logging starts, the
+    acute window fills with duration x RPE while the chronic window is still
+    mostly volume, and the ratio measures the change of unit rather than any
+    change in training. On real sessions that step is roughly 2x to 6x — far
+    past the 1.8 ceiling where `acwr_penalty` saturates — so readiness would
+    take its full ACWR penalty every day for a month, and the brief would
+    faithfully explain a spike that never happened.
+
+    Pass `daily_bases` (aligned to `daily_loads`, each entry the set of bases
+    contributing to that day) to enable the check. It resolves itself: once
+    28 days of RPE-based load have accumulated, the window is uniform again
+    and the ratio comes back on the better definition.
     """
     if len(daily_loads) < min_days:
         return None
     window = daily_loads[-CHRONIC_WINDOW_DAYS:]
     if sum(1 for load in window if load > 0) < min_training_days:
         return None
+    if daily_bases is not None:
+        seen: set[str] = set()
+        for bases in daily_bases[-CHRONIC_WINDOW_DAYS:]:
+            seen |= bases
+        if len(seen) > 1:
+            return None
     chronic = chronic_load(daily_loads)
     if chronic <= 0:
         return None

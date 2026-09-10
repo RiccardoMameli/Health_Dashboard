@@ -45,7 +45,7 @@ from app.metrics.derived import (
     daily_load,
     data_completeness_pct,
     protein_g_per_kg,
-    session_load,
+    session_load_and_basis,
     sleep_debt,
     sleep_midpoint_variance,
     weight_ewma_series,
@@ -128,21 +128,34 @@ def _by_date(session: Session, model, start: Date, end: Date) -> dict:
     }
 
 
-def _daily_loads(session: Session, start: Date, end: Date) -> list[float]:
-    """Training load per calendar day. A rest day is a real zero."""
+def _daily_loads(
+    session: Session, start: Date, end: Date
+) -> tuple[list[float], list[set[str]]]:
+    """Training load per calendar day, and which definitions produced it.
+
+    A rest day is a real zero. The per-day set of bases is empty on a rest day
+    and carries one entry per definition used that day; `acwr` needs it to
+    refuse a ratio across a window that changed units mid-way.
+    """
     workouts = list(
         session.execute(select(Workout).where(Workout.date >= start, Workout.date <= end)).scalars()
     )
     per_day: dict[Date, list[float | None]] = {}
+    bases_by_day: dict[Date, set[str]] = {}
     for w in workouts:
-        per_day.setdefault(w.date, []).append(
-            session_load(
-                duration_min=w.duration_min,
-                rpe=w.perceived_exertion_1_10,
-                volume_kg=w.total_volume_kg,
-            )
+        load, basis = session_load_and_basis(
+            duration_min=w.duration_min,
+            rpe=w.perceived_exertion_1_10,
+            volume_kg=w.total_volume_kg,
         )
-    return [daily_load(per_day.get(d, [])) for d in _dates(start, end)]
+        per_day.setdefault(w.date, []).append(load)
+        if basis is not None:
+            bases_by_day.setdefault(w.date, set()).add(basis)
+    days = _dates(start, end)
+    return (
+        [daily_load(per_day.get(d, [])) for d in days],
+        [bases_by_day.get(d, set()) for d in days],
+    )
 
 
 def _days_since_rest(session: Session, day: Date, *, lookback: int = 30) -> int | None:
@@ -286,10 +299,10 @@ def compute_day(session: Session, day: Date, settings: Settings | None = None) -
     out.hrv_deviation_pct = relative_deviation(out.hrv_ms, out.hrv_baseline)
 
     # ── training ─────────────────────────────────────────────────────────
-    loads = _daily_loads(session, day - timedelta(days=LOAD_WINDOW_DAYS - 1), day)
+    loads, load_bases = _daily_loads(session, day - timedelta(days=LOAD_WINDOW_DAYS - 1), day)
     out.acute_load_7d = acute_load(loads)
     out.chronic_load_28d = chronic_load(loads)
-    out.acwr = acwr(loads)
+    out.acwr = acwr(loads, daily_bases=load_bases)
     out.days_since_rest = _days_since_rest(session, daytime)
     out.last_workout = session.execute(
         select(Workout).where(Workout.date <= day).order_by(Workout.start_at.desc()).limit(1)
