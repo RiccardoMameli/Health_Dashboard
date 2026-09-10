@@ -861,13 +861,31 @@ user. A single confident percentage per muscle is exactly the confident
 fabrication §2.2 C2 exists to prevent — it would simply be arriving from a
 lookup table instead of from a model.
 
-The honest version shows the facts and labels the estimate as one:
+The honest version shows the facts and labels the estimate as one. Crucially
+this still gives the glanceable coloured figure — it is the *scalar* that is
+the problem, not the colour:
 
 - **hours since last stimulus** and **working-set volume applied**, per group —
   both measured, both from data already held;
-- the recovery window as a **named reference band** ("typically 48–72h"), drawn
-  as a band rather than collapsed into a number, and stated on the screen as a
-  population figure rather than a personal one;
+- the figure shades each group into **four discrete states**, not a percentage:
+  worked (under ~24h), recovering (~24–48h), likely ready (~48–72h), ready
+  (beyond, or not trained in the window). Four states is roughly the
+  resolution population data can honestly support; a percentage implies a
+  precision it cannot;
+- **band boundaries vary by muscle group**, longer for large and
+  eccentric-heavy groups (quadriceps, hamstrings, glutes, lower_back) than
+  small ones (biceps, calves, forearms), which is the part that genuinely
+  reflects the literature;
+- boundaries **modulated by volume relative to his own median for that group**
+  — three sets of curls and ten sets of squats are not the same stimulus, and
+  his own median is a measurement rather than a population guess, so this
+  personalises the estimate without inventing anything;
+- per §10.3, **status colour always carries its word** and never signals
+  alone: each group is labelled with its state and its hours-since, so the
+  screen is readable in greyscale and by a colour-blind reader, and the figure
+  doubles as a plain record of the last few days' training;
+- the band legend states on the screen that the windows are **population
+  estimates, not measurements of him**;
 - no single "% recovered" scalar, and no training recommendation derived from
   it during `baseline`.
 

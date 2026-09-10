@@ -15,7 +15,9 @@ build/
 .DS_Store
 data/exports/
 
-# Local verification output from scripts/verify_hevy.py. These carry the raw
-# API response — real workout ids, titles and notes — with none of the
-# scrubbing the committed fixture gets. Keep them out of the repo.
+# Local output from the scripts/verify_*.py diagnostics. These carry raw,
+# unscrubbed data — real workout ids, titles, notes and training figures —
+# with none of the scrubbing the committed fixture gets. Keep them out of the
+# repo; they are meant to be read once and deleted.
 hevy-report*.txt
+metrics-report*.txt
