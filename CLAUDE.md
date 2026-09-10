@@ -19,8 +19,18 @@ daily brief with its traceability guard (`app/ai/`), email delivery, and the
 06:30 job (`scripts/daily_brief.py`). 139 tests passing.
 
 The Hevy adapter is verified against the live API (10 Sep 2026, 274 workouts)
-and its fixture is real scrubbed data. Nothing else is: Withings, the metrics
-engine and the readiness score have still only ever seen fixtures.
+and its fixture is real scrubbed data. The metrics engine has now run over
+that real history too (`scripts/verify_metrics.py`). Withings and the
+readiness score have still only ever seen fixtures.
+
+`GET /ui` serves the Today screen against live data, with the per-muscle
+recovery figure (plan §14.1 F1). 163 tests passing.
+
+**Readiness needs 5 of 7 fields to clear the 60% floor, and Samsung Health
+supplies 4 of them.** Withings, MyFitnessPal and the check-in supply one each,
+so without the sleep stream the ceiling is 43% and the score reads
+`insufficient_data` no matter what else is connected. This is the constraint
+that decides what is worth building next; it is not a code problem.
 
 Phase 2's *gate* is not met and cannot be met by writing code: it needs seven
 consecutive days of an accurate brief against real data. Same for Phase 1's

@@ -6,6 +6,170 @@ of each working session.
 
 ---
 
+## 10 September 2026 — the data reaches a screen
+
+The morning's session got real Hevy data in. This one put it in front of a
+reader, and found that most of what was wrong was in the parts nobody had
+looked at yet. 163 tests passing.
+
+### The screen exists
+
+`GET /ui` serves the Glacier reference from the backend, fetching
+`/api/v1/today` on load. The four hand-written mornings are gone — an example
+on a screen whose job is showing what is yours is worse than a blank — so the
+live view is the only view. The page is unauthenticated because it is markup;
+the browser holds the bearer token for the data behind it.
+
+**Pointing the design at real data broke it four times**, none of which the
+four designed mornings could expose, because all four carry data in every
+field:
+
+1. `renderTraining` called `acwr.toFixed(2)` unguarded. ACWR is null more often
+   than not for this account, so the live view threw on arrival.
+2. `renderWeight` took `vals[vals.length - 1].toFixed(1)` on an empty series
+   and aborted the whole render, leaving the page half-drawn — which is why
+   the first screenshot showed a mix of correct and stale values.
+3. `renderRhr` on an all-null series computed `Math.min` of nothing, put NaN
+   in a circle's `cy`, and the browser rejected it.
+4. The intro roll-up animation writes `#score` every frame for 1.1s after
+   load, counting to a hard-coded 62. Click into a no-score morning inside
+   that window and it painted 62 back over the em-dash — **a fabricated
+   readiness score sitting under a "no score" label**, on the screen whose
+   entire purpose is to never do that. It had been there since the design was
+   drawn on 3 September and only surfaced because an automated click was
+   faster than a human usually is.
+
+### A splice that duplicated half the page
+
+Removing the design-language section searched for `"MyFitnessPal"` to find the
+end of a row and matched an earlier occurrence — "MyFitnessPal does not sync
+macros", further up. End landed before start, so `t[:a] + t[b:]` concatenated
+the overlap instead of removing it, and the entire tile block rendered twice.
+
+Nothing threw. `getElementById` returns the first match, so the live render
+updated one copy and left the other showing the design's hand-written values:
+a second set of entirely plausible tiles. Two things stop it recurring: every
+splice now searches for its closing marker from the opening marker's position
+and asserts `end > start`, and **a test asserts every id on the page is
+unique**. The assertion caught the same class of bug again during the rebuild.
+
+### Layout, and what the screen refuses to claim
+
+Twelve cards of equal weight meant nothing said where to look. Split into
+*This morning* — readiness, brief, yesterday's session, weight, sleep trend —
+and *The record* below it. Three new tiles drawn and marked Coming soon, every
+value an em-dash: sleep consistency as nights-at-target out of seven rather
+than a mean, which would hide exactly the inconsistency worth seeing; steps;
+and energy balance as two bars on one shared scale, because the gap between
+them is what is being read.
+
+Everything invented is gone — a "day 12 of 42" phase counter, a 93% supplement
+adherence rate, an 11-day streak, an 87% completion figure, four made-up sync
+timestamps. What is not built is greyed and labelled rather than hidden. Dates
+are DD-MM-YYYY; the API keeps ISO because it sorts unambiguously.
+
+### The metrics engine, against real data for the first time
+
+`scripts/verify_metrics.py` runs the engine over the real backfill. What it
+found, on 274 workouts:
+
+- **The load-definition problem, confirmed by the owner's own workout titles.**
+  A 13.0x spread between heaviest and lightest session against 4.1x in
+  duration. The three heaviest are "Big leg day + abs", "Legs + abs", "Legs";
+  the three lightest "Quick chest day", "Quick chest day", "Quick Push day".
+  "Legs + abs" ran 18% longer than "Quick chest day" and scored 8.8x the load.
+- **ACWR flagged 27% of assessable days**, 27 of them at the full penalty, in
+  consecutive clusters — consistent with leg days bunching, not with
+  overreaching.
+- **ACWR could not compute on 638 of 1109 days.** It needs 8 training days per
+  28; the history averages 1.69 sessions a week. It will be unavailable more
+  often than not, so readiness leans on sleep and subjective more than the
+  design assumed.
+- **Volume progression is flat.** Every slope is under half a percent of the
+  weekly mean — `+13 kg/wk` on calf extension reads like progress and is 0.19%.
+- **The ACWR-of-4.0 guard fired on real data.** On 8 September acute was 50.24
+  against chronic 12.56 — exactly 4.0, the spurious value the 3 September
+  session fixed against fixtures. It returned None, because only one training
+  day sat in the window.
+
+### Qualifying a number rather than suppressing it
+
+The tempting response to a 27% flag rate was to withhold ACWR while load is
+volume-derived. The owner's call was the better one: *build for the data you
+intend to feed, not the data you have.* RPE logging has started, and in a
+month the same code path carries the definition it was designed for.
+
+So `load_quality` reports which definition produced the chronic window —
+`rpe_based`, `volume_based`, `mixed` — and travels with acute, chronic and
+ACWR through the §9.1 contract, `/today`, and a new `daily_metrics` column so
+a stored ratio is still readable a year on. **The caveat wording lives in
+tested code**, and prompt rule 4 requires the model to reproduce it verbatim
+rather than compose its own: a caveat the model writes is a caveat it can
+soften on a day it wants a cleaner story. Migration 0002, nullable with no
+backfill — rows computed before the column existed genuinely do not know their
+basis, and backfilling "volume_based" would be an assumption dressed as a
+record.
+
+### The recovery figure (§14.1 F1)
+
+Two schematic silhouettes beside the readiness gauge, each muscle group shaded
+by how recently and how hard it was worked. The data path already existed:
+every set carries an `exercise_template_id`, and Hevy's
+`/v1/exercise_templates/{id}` returns its own muscle-group vocabulary. A new
+`exercise_templates` table caches them (migration 0003); the sync walks only
+the distinct ids present in `workout_sets`.
+
+**Four states, no percentage.** "Chest: 60% recovered" reads as measured and is
+not. Windows vary by group — 36h for biceps and calves against 72h for quads
+and the posterior chain — and stretch with volume relative to the owner's own
+median for that group, which *is* a measurement. On real data the separation
+shows: triceps read likely ready while chest is still recovering from the same
+session. A group never worked reports "not trained", not "ready".
+
+**The existing "no time series" test earned its place.** `muscle_recovery` is
+seventeen rows of hours and volumes, and it went into `build_brief_input`
+before the test caught it. It now reaches `/today` only.
+
+Two follow-ups came from the owner looking at it. The empty-figure note blamed
+setup regardless of cause, so a genuine rest week would have read as a broken
+install; `muscle_recovery_status` now distinguishes unmapped, no recent
+training, and ok. And the template sync — 166 distinct exercises on this
+account — gave a silent minute of terminal and committed nothing until the
+end, so an interrupted run discarded everything. It now reports progress and
+commits every 20; verified by killing a run on its 55th request and watching
+40 templates survive and the re-run resume.
+
+### The finding that decides what happens next
+
+Readiness needs 5 of 7 fields to clear the 60% completeness floor. Samsung
+Health supplies 4 of them — sleep duration, sleep efficiency, resting HR,
+steps. Withings, MyFitnessPal and the check-in supply one each.
+
+**Without Samsung the ceiling is 3 of 7, or 43%.** Every other source
+connected, a perfect check-in streak, and the score still reads
+`insufficient_data` forever. With Samsung plus any one other source it works.
+
+The dashboard is a good training dashboard. It is not yet a health dashboard,
+and no further code changes that.
+
+### Also
+
+`docs/outstanding.md` records everything deferred, grouped by what would
+actually unblock it — six items are free signups, three cannot be compressed
+by writing any code. Merging to `main` on green is now the working agreement:
+three times work sat on a feature branch while the owner was on `main`, and
+each time the symptom was a confusing failure rather than an obvious one.
+
+Removed `metrics-report.txt`, committed before the gitignore pattern covering
+it landed — gitignore does not untrack a tracked file.
+
+### Next
+
+The Samsung Health export, or the check-in form and somewhere to host it so
+the seven-day clock starts. Neither is blocked by code.
+
+---
+
 ## 10 September 2026 — the Hevy adapter, verified against the real API
 
 **The first session with real data in it.** 274 workouts, 4331 sets, 31 July
