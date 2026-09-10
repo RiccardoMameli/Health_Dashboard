@@ -102,7 +102,7 @@ def describe(name: str, raw: bytes, why: str, full_rows: bool) -> None:
     body = list(csv.reader(lines[header_line + 1 :]))
     body = [r for r in body if any(f.strip() for f in r)]
 
-    print(f"\n{'─' * 70}\n{name}\n  ({why})")
+    print(f"\n{'-' * 70}\n{name}\n  ({why})")
     print(f"  bytes {len(raw):,} · {len(body):,} data rows")
     if header_line:
         print(f"  ! the real header is on line {header_line + 1}, not line 1")
@@ -136,6 +136,15 @@ def collect(path: Path) -> list[tuple[str, bytes]]:
 
 
 def main() -> int:
+    # Windows consoles encode as cp1252. verify_hevy.py already had to learn
+    # this; not carrying it here meant every file in a real export reported as
+    # unreadable because of one box-drawing character in a separator.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
     parser = argparse.ArgumentParser()
     parser.add_argument("path", type=Path, help="the export .zip or the extracted folder")
     parser.add_argument("--full-rows", action="store_true",
@@ -147,9 +156,15 @@ def main() -> int:
         print("Nothing found at that path.")
         return 1
 
-    print(f"=== inventory: {len(files)} files ===")
-    for name, raw in sorted(files, key=lambda f: -len(f[1])):
-        print(f"  {len(raw):>12,}  {name}")
+    total = sum(len(raw) for _, raw in files)
+    csvs = [f for f in files if f[0].lower().endswith(".csv")]
+    print(f"=== inventory: {len(files):,} files, {total / 1e6:,.0f} MB ===")
+    print(f"  {len(csvs)} CSV, {len(files) - len(csvs)} other (mostly per-session JSON)\n")
+    # Listing every file makes a report too large to read and drowns the part
+    # that matters. The CSVs are the schema; the JSON is per-session detail.
+    print("  all CSV files, largest first:")
+    for name, raw in sorted(csvs, key=lambda f: -len(f[1])):
+        print(f"    {len(raw):>12,}  {name}")
 
     print("\n\n=== structure of the files that matter ===")
     seen = set()
@@ -160,6 +175,11 @@ def main() -> int:
                 seen.add(name)
                 try:
                     describe(name, raw, why, args.full_rows)
+                except UnicodeEncodeError as exc:
+                    # The file parsed; the console could not render the result.
+                    # Distinguished because conflating them once produced a
+                    # report saying every file in a good export was unreadable.
+                    print(f"\n{name}\n  ! parsed, but this console cannot print it: {exc}")
                 except Exception as exc:   # a malformed file should not stop the report
                     print(f"\n{name}\n  ! could not parse: {type(exc).__name__}: {exc}")
 
