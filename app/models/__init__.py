@@ -19,7 +19,7 @@ from app.models.health import (
 )
 from app.models.subjective import CONFOUNDER_TAGS, Checkin
 from app.models.supplements import SCHEDULES, ProtocolChange, Supplement, SupplementLog
-from app.models.training import Workout, WorkoutSet
+from app.models.training import ExerciseTemplate, Workout, WorkoutSet
 
 __all__ = [
     "CONFOUNDER_TAGS",
@@ -43,6 +43,7 @@ __all__ = [
     "Supplement",
     "SupplementLog",
     "SyncRun",
+    "ExerciseTemplate",
     "Workout",
     "WorkoutSet",
 ]

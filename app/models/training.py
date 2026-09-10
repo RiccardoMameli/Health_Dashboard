@@ -3,7 +3,7 @@
 from datetime import date as Date
 from datetime import datetime
 
-from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy import Date as SADate
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -55,3 +55,29 @@ class WorkoutSet(Base):
     is_pr: Mapped[bool] = mapped_column(Boolean, default=False)
 
     workout: Mapped[Workout] = relationship(back_populates="sets")
+
+
+class ExerciseTemplate(Base):
+    """Hevy's catalogue entry for an exercise, cached locally.
+
+    `workout_sets.exercise_template_id` is on every set already; this is what
+    turns that id into a muscle group. Hevy serves it from
+    `GET /v1/exercise_templates/{id}` one template at a time, and the catalogue
+    barely changes, so it is fetched once and kept.
+
+    Muscle groups come from Hevy's own fixed vocabulary rather than a mapping
+    invented here: guessing "Chest Press (Machine)" trains the chest is easy,
+    and guessing wrong on the fiftieth exercise is silent.
+    """
+
+    __tablename__ = "exercise_templates"
+
+    id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    title: Mapped[str | None] = mapped_column(String(255))
+    type: Mapped[str | None] = mapped_column(String(32))
+    primary_muscle_group: Mapped[str | None] = mapped_column(String(32), index=True)
+    #: Hevy returns an array; stored as JSON because a set of secondaries has
+    #: no natural column and is only ever read whole.
+    secondary_muscle_groups: Mapped[list | None] = mapped_column(JSON)
+    is_custom: Mapped[bool] = mapped_column(Boolean, default=False)
+    fetched_at: Mapped[datetime | None]
