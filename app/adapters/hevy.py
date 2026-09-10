@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.adapters.base import Adapter, SyncResult
 from app.config import get_settings
-from app.models import SyncRun, Workout, WorkoutSet
+from app.models import ExerciseTemplate, SyncRun, Workout, WorkoutSet
 from app.services.ingest import ensure_day, store_raw
 from app.services.timeutil import local_date, to_utc, utcnow
 
@@ -307,3 +307,59 @@ class HevyAdapter(Adapter):
             )
         result.records_ingested += 1
         return workout
+
+    def sync_exercise_templates(self, session: Session) -> SyncResult:
+        """Resolve every exercise id in the history to its muscle groups.
+
+        Hevy serves templates one at a time, so this walks the distinct ids
+        actually present in `workout_sets` rather than paging the whole public
+        catalogue — a few dozen requests instead of thousands, and only for
+        exercises this account has really done.
+
+        Already-cached ids are skipped, so re-running costs nothing. A template
+        that 404s is recorded as a miss and not retried into a failure: a
+        deleted custom exercise should not stop the other fifty resolving.
+        """
+        result = SyncResult(source=SOURCE)
+        known = set(session.execute(select(ExerciseTemplate.id)).scalars())
+        ids = [
+            i
+            for i in session.execute(
+                select(WorkoutSet.exercise_template_id)
+                .where(WorkoutSet.exercise_template_id.is_not(None))
+                .distinct()
+            ).scalars()
+            if i not in known
+        ]
+        for template_id in ids:
+            try:
+                payload = self.client.get(f"/v1/exercise_templates/{template_id}")
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code == 404:
+                    result.records_skipped += 1
+                    result.notes.append(f"template {template_id} not found")
+                    time.sleep(REQUEST_DELAY_SEC)
+                    continue
+                raise
+            store_raw(
+                session,
+                source=SOURCE,
+                source_record_id=f"exercise_template:{template_id}",
+                record_type="exercise_template",
+                payload=payload,
+            )
+            session.add(
+                ExerciseTemplate(
+                    id=str(payload.get("id") or template_id),
+                    title=payload.get("title"),
+                    type=payload.get("type"),
+                    primary_muscle_group=payload.get("primary_muscle_group"),
+                    secondary_muscle_groups=payload.get("secondary_muscle_groups") or [],
+                    is_custom=bool(payload.get("is_custom")),
+                    fetched_at=utcnow(),
+                )
+            )
+            result.records_ingested += 1
+            time.sleep(REQUEST_DELAY_SEC)
+        session.flush()
+        return result

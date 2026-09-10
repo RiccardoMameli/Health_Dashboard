@@ -368,6 +368,43 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
 .sync .row b{color:var(--ink-3); font-weight:400}
 
 
+
+/* ── recovery figure: two schematic silhouettes beside the gauge ──────
+   Shapes rather than anatomy: a diagram that reads at 120px and cannot be
+   mistaken for a scan. Four states plus a gap, each carrying its word in the
+   legend, because status colour never signals alone (§10.3). */
+.gaugeRow{ display:flex; gap:20px; align-items:center; flex-wrap:wrap; }
+.gaugeRow > .gauge{ flex:0 0 auto; }
+.bodyWrap{ flex:1 1 180px; min-width:160px; }
+.bodyRow{ display:flex; gap:12px; justify-content:center; }
+.bodyFig{ margin:0; flex:0 1 92px; text-align:center; }
+.bodyFig svg{ width:100%; height:auto; max-height:148px; display:block; }
+.bodyFig figcaption{ margin-top:5px; color:var(--ink-3); }
+.mg{ fill:var(--surface-2); stroke:var(--hairline); stroke-width:.6; transition:fill .35s ease; }
+.mg.st-worked{ fill:var(--crit); stroke:var(--crit); }
+.mg.st-recovering{ fill:var(--warn); stroke:var(--warn); }
+.mg.st-likely_ready{ fill:var(--good); fill-opacity:.42; stroke:var(--good); }
+.mg.st-ready{ fill:var(--good); stroke:var(--good); }
+.mg.st-unknown{ fill:none; stroke:var(--hairline-2); stroke-dasharray:2 2; }
+.inert{ fill:var(--surface-2); stroke:var(--hairline); stroke-width:.6; }
+.bodyLegend{ display:flex; flex-wrap:wrap; gap:4px 9px; margin-top:12px; justify-content:center; }
+.bodyLegend .lg{ display:inline-flex; align-items:center; gap:5px;
+  font-family:var(--f-mono); font-size:9px; letter-spacing:.03em;
+  text-transform:uppercase; color:var(--ink-3); }
+.bodyLegend i{ width:8px; height:8px; border-radius:2.5px; border:1px solid var(--hairline); }
+.sw-worked{ background:var(--crit); border-color:var(--crit); }
+.sw-recovering{ background:var(--warn); border-color:var(--warn); }
+.sw-likely{ background:var(--good); opacity:.42; border-color:var(--good); }
+.sw-ready{ background:var(--good); border-color:var(--good); }
+.sw-unknown{ background:none; border-style:dashed; }
+.bodyNote{
+  margin:9px 0 0; color:var(--ink-3); line-height:1.5; text-align:center;
+  /* A sentence, not a label: the mono micro style is uppercase, which is
+     three heavy lines here and the one thing on the tile a reader most needs
+     to actually read. */
+  text-transform:none; letter-spacing:0; font-family:var(--f-body,inherit); font-size:11px;
+}
+
 /* ── grouping: what to do about today, then the trends behind it ── */
 .groupHead{
   display:flex; align-items:baseline; gap:10px;
@@ -467,7 +504,8 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
       <span class="micro" id="rd">Readiness</span>
 
       <div class="gaugewrap">
-        <div class="gauge">
+        <div class="gaugeRow">
+      <div class="gauge">
           <svg viewBox="0 0 186 186" role="img" aria-label="Readiness 62 out of 100, amber">
             <circle id="track" cx="93" cy="93" r="76" fill="none" stroke="var(--surface-2)" stroke-width="13"
                     stroke-linecap="round" stroke-dasharray="358.1 477.5"
@@ -483,6 +521,63 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
             <div class="of" id="scoreUnit">of 100</div>
           </div>
         </div>
+      <!-- ───────── recovery figure (plan §14.1 F1) ───────── -->
+      <div class="bodyWrap">
+        <div class="bodyRow">
+          <figure class="bodyFig">
+          <svg viewBox="0 0 100 176" role="img" aria-label="Front view, muscle groups shaded by recovery state">
+            <circle class="inert" cx="50" cy="14" r="10"></circle>
+            <rect class="inert" x="46" y="23" width="8" height="6" rx="2"></rect>
+            <rect class="mg" data-mg="shoulders" x="26" y="30" width="13" height="15" rx="4"></rect>
+            <rect class="mg" data-mg="shoulders" x="61" y="30" width="13" height="15" rx="4"></rect>
+            <rect class="mg" data-mg="chest" x="37" y="32" width="26" height="19" rx="4"></rect>
+            <rect class="mg" data-mg="biceps" x="23" y="46" width="11" height="22" rx="4"></rect>
+            <rect class="mg" data-mg="biceps" x="66" y="46" width="11" height="22" rx="4"></rect>
+            <rect class="mg" data-mg="abdominals" x="40" y="53" width="20" height="25" rx="4"></rect>
+            <rect class="mg" data-mg="forearms" x="20" y="70" width="10" height="23" rx="4"></rect>
+            <rect class="mg" data-mg="forearms" x="70" y="70" width="10" height="23" rx="4"></rect>
+            <rect class="mg" data-mg="quadriceps" x="36" y="82" width="13" height="36" rx="4"></rect>
+            <rect class="mg" data-mg="quadriceps" x="51" y="82" width="13" height="36" rx="4"></rect>
+            <rect class="mg" data-mg="calves" x="37" y="122" width="11" height="28" rx="4"></rect>
+            <rect class="mg" data-mg="calves" x="52" y="122" width="11" height="28" rx="4"></rect>
+          </svg>
+          <figcaption class="micro">Front</figcaption>
+        </figure>
+          <figure class="bodyFig">
+          <svg viewBox="0 0 100 176" role="img" aria-label="Back view, muscle groups shaded by recovery state">
+            <circle class="inert" cx="50" cy="14" r="10"></circle>
+            <rect class="inert" x="46" y="23" width="8" height="6" rx="2"></rect>
+            <rect class="mg" data-mg="shoulders" x="26" y="30" width="13" height="15" rx="4"></rect>
+            <rect class="mg" data-mg="shoulders" x="61" y="30" width="13" height="15" rx="4"></rect>
+            <rect class="mg" data-mg="traps" x="38" y="29" width="24" height="11" rx="4"></rect>
+            <rect class="mg" data-mg="upper_back" x="34" y="41" width="32" height="14" rx="4"></rect>
+            <rect class="mg" data-mg="lats" x="30" y="44" width="7" height="24" rx="4"></rect>
+            <rect class="mg" data-mg="lats" x="63" y="44" width="7" height="24" rx="4"></rect>
+            <rect class="mg" data-mg="triceps" x="23" y="46" width="11" height="22" rx="4"></rect>
+            <rect class="mg" data-mg="triceps" x="66" y="46" width="11" height="22" rx="4"></rect>
+            <rect class="mg" data-mg="lower_back" x="40" y="57" width="20" height="14" rx="4"></rect>
+            <rect class="mg" data-mg="forearms" x="20" y="70" width="10" height="23" rx="4"></rect>
+            <rect class="mg" data-mg="forearms" x="70" y="70" width="10" height="23" rx="4"></rect>
+            <rect class="mg" data-mg="glutes" x="36" y="73" width="28" height="15" rx="4"></rect>
+            <rect class="mg" data-mg="hamstrings" x="36" y="90" width="13" height="30" rx="4"></rect>
+            <rect class="mg" data-mg="hamstrings" x="51" y="90" width="13" height="30" rx="4"></rect>
+            <rect class="mg" data-mg="calves" x="37" y="124" width="11" height="26" rx="4"></rect>
+            <rect class="mg" data-mg="calves" x="52" y="124" width="11" height="26" rx="4"></rect>
+          </svg>
+          <figcaption class="micro">Back</figcaption>
+        </figure>
+        </div>
+        <div class="bodyLegend">
+          <span class="lg"><i class="sw-worked"></i>Worked</span>
+          <span class="lg"><i class="sw-recovering"></i>Recovering</span>
+          <span class="lg"><i class="sw-likely"></i>Likely ready</span>
+          <span class="lg"><i class="sw-ready"></i>Ready</span>
+          <span class="lg"><i class="sw-unknown"></i>Not trained</span>
+        </div>
+        <p class="bodyNote micro" id="bodyNote">Recovery windows are population estimates, not measurements of you.</p>
+      </div>
+      </div>
+
 
         <div class="st-amber" id="statusBlock">
           <div class="status-line">
@@ -1190,6 +1285,39 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     });
   }
 
+  /* Shade each muscle group by its state.
+
+     Regions carry data-mg rather than an id, because a group appears more
+     than once — two biceps, two quads, calves on both views — and ids must be
+     unique. Groups the payload does not mention keep the unknown treatment:
+     the figure shows the whole body either way, and a muscle with no record
+     must not read as recovered. */
+  function renderBody(s){
+    var byGroup = {};
+    (s.muscleRecovery || []).forEach(function(r){ byGroup[r.group] = r; });
+    var known = 0;
+    Array.prototype.forEach.call(document.querySelectorAll('.mg'), function(el){
+      var g = el.getAttribute('data-mg'), r = byGroup[g];
+      var state = r ? r.state : 'unknown';
+      el.setAttribute('class', 'mg st-' + state);
+      var name = g.replace(/_/g, ' ');
+      name = name.charAt(0).toUpperCase() + name.slice(1);
+      if (r && r.hours_since !== null && r.hours_since !== undefined) {
+        el.setAttribute('data-tip', name + ' · ' + r.label + ' · ' + Math.round(r.hours_since) +
+          'h ago' + (r.window_hours ? ', typically ' + Math.round(r.window_hours) + 'h' : ''));
+      } else {
+        el.setAttribute('data-tip', name + ' · ' + (r ? r.label : 'Not trained'));
+      }
+      if (r && r.state !== 'unknown') known++;
+    });
+    /* Nothing resolved means the exercise catalogue has not been synced — a
+       setup step, not a fortnight off. An all-grey body would read as the
+       second. */
+    set('bodyNote', known === 0
+      ? 'No exercises mapped yet — run scripts/sync_exercise_templates.py.'
+      : 'Recovery windows are population estimates, not measurements of you.');
+  }
+
   function renderHeader(d){
     set('headerDate', ukDate(d.date));
     var ph = d.phase ? String(d.phase) : '';
@@ -1255,6 +1383,7 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
           ? 'no data'
           : training.days_since_rest + ' days since rest'
       },
+      muscleRecovery: (d.training && d.training.muscle_recovery) || [],
       weight: {series: [], delta: 'no data', deltaClass: 'flat'}
     };
   }
@@ -1291,6 +1420,7 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     renderRhr(s);
     renderTraining(s);
     renderWeight(s);
+    renderBody(s);
     Array.prototype.forEach.call(document.querySelectorAll('.scenario'), function(b){
       b.setAttribute('aria-pressed', String(b.getAttribute('data-scenario') === key));
     });

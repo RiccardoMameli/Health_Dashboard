@@ -20,7 +20,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date as Date
-from datetime import timedelta
+from datetime import datetime, timedelta
+from statistics import median
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -54,17 +55,20 @@ from app.metrics.derived import (
     weight_trend_kg_per_week,
 )
 from app.metrics.readiness import Readiness, ReadinessInput, compute_readiness
+from app.metrics.recovery import SECONDARY_WEIGHT, muscle_recovery
 from app.models import (
     ActivityDaily,
     BodyMeasurement,
     Checkin,
     DailyMetrics,
     Day,
+    ExerciseTemplate,
     HeartMetric,
     NutritionDaily,
     ProtocolChange,
     SleepSession,
     Workout,
+    WorkoutSet,
 )
 from app.services.supplements import adherence_7d, missed_on
 from app.services.timeutil import sleep_midpoint_minutes, utcnow
@@ -158,6 +162,78 @@ def _daily_loads(
         [daily_load(per_day.get(d, [])) for d in days],
         [bases_by_day.get(d, set()) for d in days],
     )
+
+
+#: How far back to look for a muscle group's last stimulus. Beyond this a group
+#: reports "not trained" rather than "ready": at some distance the absence of a
+#: record stops being evidence of recovery and starts being an absence of data.
+RECOVERY_LOOKBACK_DAYS = 14
+
+
+def _muscle_stimuli(session: Session, now: datetime) -> tuple[dict, dict]:
+    """Per muscle group: hours since it was last worked, and with what volume.
+
+    Volume is attributed to a set's primary muscle group in full and to each
+    secondary at SECONDARY_WEIGHT — triceps in a bench press are worked, but
+    not as the chest is. Sets whose exercise has not been resolved to a
+    template are skipped rather than guessed at, so an unresolved catalogue
+    shows an empty figure instead of a wrong one.
+    """
+    since = now - timedelta(days=RECOVERY_LOOKBACK_DAYS)
+    rows = session.execute(
+        select(
+            ExerciseTemplate.primary_muscle_group,
+            ExerciseTemplate.secondary_muscle_groups,
+            WorkoutSet.weight_kg,
+            WorkoutSet.reps,
+            WorkoutSet.set_type,
+            Workout.start_at,
+        )
+        .join(WorkoutSet, WorkoutSet.workout_id == Workout.id)
+        .join(ExerciseTemplate, ExerciseTemplate.id == WorkoutSet.exercise_template_id)
+        .where(Workout.start_at >= since)
+    ).all()
+
+    latest: dict[str, datetime] = {}
+    volume_at_latest: dict[str, float] = {}
+    for primary, secondaries, weight, reps, set_type, start_at in rows:
+        if (set_type or "normal") == "warmup":
+            continue
+        load = float(weight) * int(reps) if weight is not None and reps is not None else 0.0
+        targets = [(primary, 1.0)] + [(g, SECONDARY_WEIGHT) for g in (secondaries or [])]
+        for group, share in targets:
+            if not group:
+                continue
+            previous = latest.get(group)
+            if previous is None or start_at > previous:
+                latest[group] = start_at
+                volume_at_latest[group] = load * share
+            elif start_at == previous:
+                volume_at_latest[group] = volume_at_latest.get(group, 0.0) + load * share
+
+    stimuli = {
+        group: ((now - when).total_seconds() / 3600.0, volume_at_latest.get(group, 0.0))
+        for group, when in latest.items()
+    }
+
+    # The user's own typical session volume per group, which is what the
+    # recovery window is stretched against. A median rather than a mean: one
+    # enormous leg day should not redefine what normal looks like.
+    per_session: dict[str, dict] = {}
+    for primary, secondaries, weight, reps, set_type, start_at in rows:
+        if (set_type or "normal") == "warmup":
+            continue
+        load = float(weight) * int(reps) if weight is not None and reps is not None else 0.0
+        for group, share in [(primary, 1.0)] + [(g, SECONDARY_WEIGHT) for g in (secondaries or [])]:
+            if not group:
+                continue
+            per_session.setdefault(group, {}).setdefault(start_at, 0.0)
+            per_session[group][start_at] += load * share
+    medians = {
+        group: median(sorted(v for v in sessions.values() if v > 0) or [0.0])
+        for group, sessions in per_session.items()
+    }
+    return stimuli, {g: m for g, m in medians.items() if m > 0}
 
 
 def _days_since_rest(session: Session, day: Date, *, lookback: int = 30) -> int | None:
@@ -311,6 +387,8 @@ def compute_day(session: Session, day: Date, settings: Settings | None = None) -
     out.acute_load_7d = acute_load(loads)
     out.chronic_load_28d = chronic_load(loads)
     out.acwr = acwr(loads, daily_bases=load_bases)
+    stimuli, medians = _muscle_stimuli(session, utcnow())
+    out.muscle_recovery = muscle_recovery(stimuli, median_volumes=medians)
     out.load_quality = load_quality(load_bases)
     out.load_quality_note = load_quality_note(out.load_quality)
     out.days_since_rest = _days_since_rest(session, daytime)
@@ -503,6 +581,12 @@ def build_brief_input(session: Session, computed: ComputedDay, *, phase: str = "
             "acwr": _round(computed.acwr, 2),
             "load_quality": computed.load_quality,
             "load_quality_note": computed.load_quality_note,
+            # muscle_recovery is deliberately NOT here. It is seventeen rows of
+            # hours and volumes — a series the model could do arithmetic on, and
+            # exactly what the §9.1 contract exists to keep away from it. The
+            # figure is a screen feature; /today carries it, the brief does not.
+            # If the brief ever needs it, it gets a two-line summary computed
+            # here, not the rows.
             "days_since_rest": computed.days_since_rest,
         },
         "nutrition": {
