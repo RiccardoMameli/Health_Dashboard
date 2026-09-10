@@ -89,6 +89,13 @@ this project dies (R7).
 
 ## Open items
 
+**`docs/outstanding.md` is the full list** — what is deferred, what is blocked
+on a key, what is waiting on elapsed time, and what is simply unbuilt. Read it
+at the start of a session. Note that Withings is deferred as of 10 Sep 2026,
+so **Phase 1's gate cannot close** and any further work is past an open gate,
+deliberately.
+
+
 - **O2**: MyFitnessPal does not sync macros. Decide before Phase 3 whether to
   switch to Cronometer or MacroFactor. `protein_g_per_kg` stays NULL until then.
 - **O4**: Per-muscle-group recovery view (plan §14.1 F1). Recorded, not
