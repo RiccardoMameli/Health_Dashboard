@@ -25,12 +25,17 @@ from app.metrics.baselines import (
 from app.metrics.derived import (
     LOAD_BASIS_RPE,
     LOAD_BASIS_VOLUME,
+    LOAD_QUALITY_MIXED,
+    LOAD_QUALITY_RPE,
+    LOAD_QUALITY_VOLUME,
     acute_load,
     acwr,
     acwr_penalty,
     chronic_load,
     daily_load,
     data_completeness_pct,
+    load_quality,
+    load_quality_note,
     protein_g_per_kg,
     session_load,
     session_load_and_basis,
@@ -311,3 +316,48 @@ def test_a_single_mixed_day_deep_in_the_window_still_withholds():
     bases = [VOL] * 28
     bases[0] = RPE
     assert acwr([50.0] * 28, daily_bases=bases) is None
+
+
+# --- qualifying the load figures rather than withholding them ----------------
+#
+# A volume-derived ACWR is a real number answering a narrower question. It is
+# reported, not suppressed — but never bare: the reader is told what produced
+# it. The wording lives in tested code so the AI layer reproduces it rather
+# than composing its own.
+
+
+def test_load_quality_names_the_definition_behind_the_window():
+    assert load_quality([VOL] * 28) == LOAD_QUALITY_VOLUME
+    assert load_quality([RPE] * 28) == LOAD_QUALITY_RPE
+    assert load_quality([VOL] * 21 + [RPE] * 7) == LOAD_QUALITY_MIXED
+
+
+def test_load_quality_is_null_for_a_window_with_no_training():
+    """Nothing to qualify. A quality label on an empty window would imply
+    data that is not there."""
+    assert load_quality([set()] * 28) is None
+    assert load_quality_note(None) is None
+
+
+def test_only_the_volume_and_mixed_cases_carry_a_note():
+    """An RPE-based window needs no caveat — it is the intended definition."""
+    assert load_quality_note(LOAD_QUALITY_RPE) is None
+    volume_note = load_quality_note(LOAD_QUALITY_VOLUME)
+    assert volume_note is not None
+    assert "volume-derived" in volume_note
+    assert "RPE" in volume_note
+    assert load_quality_note(LOAD_QUALITY_MIXED) is not None
+
+
+def test_a_volume_based_window_still_reports_its_ratio():
+    """The point of the qualifier: the number is kept and labelled, not
+    suppressed. Suppressing it would build for the data on hand rather than
+    the data intended."""
+    loads = [50.0] * 28
+    assert acwr(loads, daily_bases=[VOL] * 28) is not None
+    assert load_quality([VOL] * 28) == LOAD_QUALITY_VOLUME
+
+
+def test_rest_days_do_not_dilute_the_quality_label():
+    bases = [set() if i % 3 == 0 else VOL for i in range(28)]
+    assert load_quality(bases) == LOAD_QUALITY_VOLUME

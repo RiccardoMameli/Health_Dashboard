@@ -44,6 +44,8 @@ from app.metrics.derived import (
     chronic_load,
     daily_load,
     data_completeness_pct,
+    load_quality,
+    load_quality_note,
     protein_g_per_kg,
     session_load_and_basis,
     sleep_debt,
@@ -208,6 +210,12 @@ class ComputedDay:
     acute_load_7d: float | None = None
     chronic_load_28d: float | None = None
     acwr: float | None = None
+    #: Which definition produced the load in the chronic window, and the
+    #: reader-facing sentence for it. Reported beside ACWR rather than folded
+    #: into it: a volume-derived ratio is a real number answering a narrower
+    #: question, and the reader is entitled to know which question.
+    load_quality: str | None = None
+    load_quality_note: str | None = None
     days_since_rest: int | None = None
     last_workout: Workout | None = None
 
@@ -303,6 +311,8 @@ def compute_day(session: Session, day: Date, settings: Settings | None = None) -
     out.acute_load_7d = acute_load(loads)
     out.chronic_load_28d = chronic_load(loads)
     out.acwr = acwr(loads, daily_bases=load_bases)
+    out.load_quality = load_quality(load_bases)
+    out.load_quality_note = load_quality_note(out.load_quality)
     out.days_since_rest = _days_since_rest(session, daytime)
     out.last_workout = session.execute(
         select(Workout).where(Workout.date <= day).order_by(Workout.start_at.desc()).limit(1)
@@ -407,6 +417,7 @@ def persist(session: Session, computed: ComputedDay) -> DailyMetrics:
     row.acute_load_7d = computed.acute_load_7d
     row.chronic_load_28d = computed.chronic_load_28d
     row.acwr = computed.acwr
+    row.load_quality = computed.load_quality
     row.weight_ewma_kg = computed.weight_ewma_kg
     row.weight_trend_kg_per_week = computed.weight_trend_kg_per_week
     row.protein_g_per_kg = computed.protein_g_per_kg
@@ -490,6 +501,8 @@ def build_brief_input(session: Session, computed: ComputedDay, *, phase: str = "
             "acute_load_7d": _round(computed.acute_load_7d),
             "chronic_load_28d": _round(computed.chronic_load_28d),
             "acwr": _round(computed.acwr, 2),
+            "load_quality": computed.load_quality,
+            "load_quality_note": computed.load_quality_note,
             "days_since_rest": computed.days_since_rest,
         },
         "nutrition": {

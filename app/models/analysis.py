@@ -35,6 +35,10 @@ class DailyMetrics(Base):
     acute_load_7d: Mapped[float | None] = mapped_column(Float)
     chronic_load_28d: Mapped[float | None] = mapped_column(Float)
     acwr: Mapped[float | None] = mapped_column(Float)
+    #: rpe_based | volume_based | mixed. Which definition produced the load
+    #: behind acute/chronic/acwr on this day, so a historical ratio can be
+    #: read with the right amount of confidence rather than none.
+    load_quality: Mapped[str | None] = mapped_column(String(16))
 
     weight_ewma_kg: Mapped[float | None] = mapped_column(Float)
     weight_trend_kg_per_week: Mapped[float | None] = mapped_column(Float)

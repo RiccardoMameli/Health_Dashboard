@@ -91,6 +91,12 @@ this project dies (R7).
 
 - **O2**: MyFitnessPal does not sync macros. Decide before Phase 3 whether to
   switch to Cronometer or MacroFactor. `protein_g_per_kg` stays NULL until then.
+- **O4**: Per-muscle-group recovery view (plan §14.1 F1). Recorded, not
+  scheduled — earliest Phase 4. Muscle groups are resolvable from Hevy's
+  exercise templates using data already imported; steps and stairs need Phase
+  3. A "% recovered" per muscle would be fabricated precision from a lookup
+  table, so the design shows hours-since-stimulus and volume as facts with the
+  recovery window as a labelled population band.
 - **HRV/SpO2** availability via Health Connect is unverified. Until it is
   tested on a real device, assume the fallback readiness formula (sleep,
   resting HR, subjective).
