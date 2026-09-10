@@ -6,6 +6,125 @@ of each working session.
 
 ---
 
+## 10 September 2026 — status check, and the first attempt at real Hevy data
+
+**No application code changed.** Environment set up, migrations and seed run
+against a local SQLite database, and the Hevy adapter audited against the
+published API specification. **The real import did not happen** — two blockers,
+below.
+
+### Where the project actually stands
+
+- Repo unchanged since the two commits of 3 September; both are now on GitHub.
+- **Keys held: Hevy only.** No Withings, Supabase, Anthropic or Resend.
+- Overnight watch wear is patchy, and the one-off Samsung Health export has
+  still not been run.
+- Nothing is deployed.
+- **Phase 1's acceptance gate is not passed** and has not moved: it needs seven
+  consecutive days of check-ins plus a full, correct Hevy and Withings import.
+  Withings cannot start at all without its credentials, so the gate is blocked
+  on key collection, not on code.
+
+Phase 0's gate is likewise still half-met — schema builds, no production
+health check — for the same reason.
+
+### Local environment
+
+Python 3.11.15, `.venv`, `pip install -e ".[dev]"`. `alembic upgrade head`
+builds all 20 tables on SQLite; the seed creates the eight-item supplement
+stack. 126 tests pass, `ruff check app tests` clean. `.env` written with
+`DATABASE_URL=sqlite+pysqlite:///./health.db` and every key left blank.
+
+### Blocker 1 — the Hevy API is not reachable from the build environment
+
+`api.hevyapp.com` is refused at the egress proxy (403 to CONNECT). This is an
+environment policy, not a code fault and not something to route around, so the
+"verify against the real API rather than the fixture" work cannot be done from
+here regardless of the key. It needs either a host that can reach the API or a
+scrubbed real response captured elsewhere and committed as the fixture.
+
+### Blocker 2 — the key is not in the environment
+
+`.env` carries `HEVY_API_KEY=` with a comment saying where to paste it. Until
+it is set the backfill fails, which it did:
+
+```
+=== hevy backfill ===
+  FAILED: RuntimeError: HEVY_API_KEY is not set
+```
+
+Worth recording that this is the *correct* failure. The `sync_runs` table has
+the row — `status=failed`, `error_message=RuntimeError: HEVY_API_KEY is not
+set` — rather than a silent skip. That is the R6 failure mode the 3 September
+session fixed, verified against a real missing key for the first time.
+
+### What the audit against the OpenAPI spec found
+
+The adapter was checked field by field against the published Hevy
+specification. This is weaker than a real response but stronger than the
+hand-written fixture, which is the only thing it had been checked against.
+
+**Every field the adapter reads exists with the name and shape it expects.**
+Envelope (`workouts`, `events`, `page_count`), workout (`id`, `title`,
+`description`, `start_time`, `end_time`, `exercises`), exercise (`title`,
+`exercise_template_id`, `sets`) and set (`index`, `type`, `weight_kg`, `reps`,
+`rpe`, `distance_meters`, `duration_seconds`) all match, as do the `updated`
+and `deleted` event shapes. The `pageSize` cap of 10 is confirmed.
+
+Four things the fixture does not cover, in rough order of how much they matter:
+
+1. **Volume load is not the primary load definition, and nothing says so.**
+   `session_load` prefers `duration x RPE` and falls back to volume. But
+   `Workout.perceived_exertion_1_10` is **never written** — the Hevy adapter
+   does not set it, and no other writer exists. Hevy carries RPE *per set*,
+   which the adapter stores on `workout_sets` and never aggregates. So for
+   every Hevy workout the primary branch is dead code and training load runs
+   entirely on the fallback. ACWR, and through it readiness, currently rests
+   on a definition the plan treats as the second choice.
+2. **A bodyweight or cardio session records as zero load, not as unknown.**
+   `_volume_kg` returns `0.0` when no set has both a weight and reps — which
+   is exactly what pull-ups, dips, planks and treadmill work look like in
+   Hevy. `session_load`'s docstring says an unquantifiable session "must not
+   silently count as zero load", and its `None` guard is defeated because the
+   adapter writes `0.0` rather than `None`. A real training day would land in
+   the chronic-load window as a rest day.
+3. **`dropset` and `failure` set types are untested.** The spec lists four set
+   types; the fixture has two. The adapter counts both toward volume and the
+   working-set count, which is probably right, but it is untested and unstated.
+4. **The fixture is thinner than a real payload.** It omits `routine_id`,
+   `updated_at`, `created_at`, per-exercise `notes` and `supersets_id`, and
+   per-set `custom_metric`; real sets send `distance_meters` and
+   `duration_seconds` as explicit nulls rather than omitting them. The adapter
+   uses `.get()` throughout so none of this breaks, but the fixture's `id`
+   ends `tc001` and is not a valid UUID, which is a fair summary of how
+   hand-written it is.
+
+Also noted: `/v1/workouts/count` exists and is unused. It is the cheap
+cross-check that a backfill imported everything, and the backfill should
+assert against it.
+
+**None of 1–4 has been changed.** They are findings, not fixes; 1 and 2 are
+decisions about what training load means, which is not a call to make silently
+inside an adapter.
+
+### Not verified, and still open
+
+Date attribution near midnight, the total-volume hand-check on a real workout,
+and the workout count and date range all need the real data. Note for when it
+arrives: a workout is attributed to the local date it **started**
+(`local_date(start_at)`), which is deliberate but written down nowhere — only
+sleep belongs to the day it ends. A session starting 23:50 and ending 00:40
+counts to the day it began.
+
+### Next session
+
+Get a real Hevy response, from a machine that can reach the API. Then the
+backfill, the count and date-range check, the hand-verified volume figure, and
+a scrubbed real payload committed as the fixture. Decide 1 and 2 above before
+readiness is trusted against real training data.
+
+---
+
 ## 3 September 2026 — UI preview made deployable and explorable
 
 `docs/ui/glacier-today.html` now renders from a data object rather than fixed
