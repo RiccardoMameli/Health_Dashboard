@@ -184,20 +184,15 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
 .st-none .status-glyph{background:var(--ink-3)}
 .st-none .status-name{color:var(--ink-3)}
 
-/* ── not built yet: drawn, but plainly not yours ──────────────────────
-   Greyed and labelled rather than hidden, so the shape of what is coming
-   stays visible while it is unmistakably not a measurement. */
-.card.soon{ position:relative; }
-.card.soon > *:not(.soonTag){ opacity:.32; filter:grayscale(1); pointer-events:none; }
-[hidden]{ display:none !important; }
-
-.soonTag{
-  position:absolute; top:12px; right:12px; z-index:2;
-  font-family:var(--mono,monospace); font-size:10.5px; letter-spacing:.08em;
-  text-transform:uppercase; color:var(--ink-2);
+/* ── live-mode disclaimer: which tiles are real and which are drawn ── */
+.liveNote{
+  margin:0 0 18px; padding:10px 14px; max-width:none;
+  font-size:12.5px; line-height:1.5; color:var(--ink-2);
   background:var(--surface-2); border:1px solid var(--hairline);
-  border-radius:999px; padding:3px 9px;
+  border-left:3px solid var(--warn); border-radius:8px;
 }
+.liveNote strong{ color:var(--ink); font-weight:600; }
+.liveNote code{ font-family:var(--mono,monospace); font-size:12px; }
 
 /* ── scenario switcher: the states the design has to survive ── */
 .scenarios{display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:0 2px 18px}
@@ -372,6 +367,56 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
 .sync .row i{width:5px; height:5px; border-radius:50%; display:block}
 .sync .row b{color:var(--ink-3); font-weight:400}
 
+
+/* ── grouping: what to do about today, then the trends behind it ── */
+.groupHead{
+  display:flex; align-items:baseline; gap:10px;
+  margin:26px 0 12px; font-size:15px; font-weight:600; color:var(--ink);
+}
+.groupHead:first-of-type{ margin-top:4px; }
+.groupHead span{
+  font-family:var(--mono,monospace); font-size:10.5px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--ink-3); font-weight:400;
+}
+
+/* ── seven nights at a glance: a filled dot is a night that hit target ── */
+.dots{ display:flex; gap:6px; margin:10px 0 2px; }
+.dot7{
+  flex:1; height:8px; border-radius:3px;
+  background:var(--surface-2); border:1px solid var(--hairline);
+}
+.dot7.hit{ background:var(--accent); border-color:var(--accent); }
+.dot7.miss{ background:var(--surface-2); }
+.dot7.gap{ background:transparent; border-style:dashed; }
+
+.microrow{ display:flex; justify-content:space-between; gap:10px; margin-top:8px; }
+.microrow b{ color:var(--ink); font-weight:600; }
+
+/* ── energy balance: two bars on one scale, because the gap is the point ── */
+.balance{ display:flex; flex-direction:column; gap:8px; margin:10px 0 2px; }
+.balRow{ display:grid; grid-template-columns:26px 1fr auto; align-items:center; gap:8px; }
+.balTrack{
+  height:8px; border-radius:4px; background:var(--surface-2);
+  border:1px solid var(--hairline); overflow:hidden;
+}
+.balFill{ display:block; height:100%; border-radius:4px; }
+.balFill.in{ background:var(--accent); }
+.balFill.out{ background:var(--ink-3); }
+.src.s-mfp i{ background:#8AA83F; }
+
+[hidden]{ display:none !important; }
+
+/* ── not built yet: drawn, but plainly not yours ── */
+.card.soon{ position:relative; }
+.card.soon > *:not(.soonTag){ opacity:.32; filter:grayscale(1); pointer-events:none; }
+.soonTag{
+  position:absolute; top:12px; right:12px; z-index:2;
+  font-family:var(--mono,monospace); font-size:10.5px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--ink-2);
+  background:var(--surface-2); border:1px solid var(--hairline);
+  border-radius:999px; padding:3px 9px;
+}
+
 /* ── design language section ── */
 .spec{margin-top:44px; border-top:1px solid var(--hairline); padding-top:30px}
 .spec h3{font-family:var(--f-display); font-weight:600; font-size:19px; letter-spacing:-.01em; margin:0 0 6px}
@@ -412,6 +457,8 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     <span class="pill" id="liveStatus" hidden></span>
     <button class="pill" id="theme" type="button" aria-label="Switch colour theme">Theme</button>
   </header>
+
+  <h2 class="groupHead">This morning<span>what to do about today</span></h2>
 
   <div class="bento">
 
@@ -516,8 +563,84 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
       <div class="feedback">
         <span class="micro" style="margin-right:4px">Was this useful</span>
         <span class="soonTag" style="position:static">Coming soon</span>
+        <button class="fb" type="button" aria-pressed="false">Yes</button>
+        <button class="fb" type="button" aria-pressed="false">No</button>
+      </div>
     </section>
 
+    <section class="card tile span-4" aria-labelledby="t4">
+      <div class="head">
+        <span class="micro" id="t4">Weight trend</span>
+        <span class="delta ok" id="weightDelta">−0.24 kg/wk</span>
+      </div>
+      <div class="val" id="weightVal">84.2<small>kg</small></div>
+      <svg class="spark" viewBox="0 0 220 70" role="img"
+           aria-label="Smoothed weight over 30 days, falling from 85.0 to 84.2 kilograms">
+        <path id="weightArea" d="M10,18 L28.2,20.3 L46.4,22 L64.5,24.7 L82.7,27 L100.9,28.7 L119.1,32 L137.3,34.7 L155.5,37 L173.6,40 L191.8,42.7 L210,45.3 L210,58 L10,58 Z"
+              fill="var(--accent-soft)"></path>
+        <polyline id="weightLine" points="10,18 28.2,20.3 46.4,22 64.5,24.7 82.7,27 100.9,28.7 119.1,32 137.3,34.7 155.5,37 173.6,40 191.8,42.7 210,45.3"
+                  fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>
+        <circle id="weightDot" cx="210" cy="45.3" r="4.5" fill="var(--accent)" stroke="var(--bg)" stroke-width="2"></circle>
+        <text x="0" y="12" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9" id="weightHi">85.0</text>
+        <text x="186" y="66" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9" id="weightLo">84.2</text>
+      </svg>
+      <div class="foot">
+        <span class="src s-withings"><i></i>Withings</span>
+        <span class="micro">EWMA · 30 d</span>
+      </div>
+    </section>
+
+    <section class="card tile span-4" aria-labelledby="t3">
+      <div class="head">
+        <span class="micro" id="t3">Yesterday</span>
+        <span class="delta flat" id="trainDelta">RPE 8</span>
+      </div>
+      <div class="val" id="trainTitle" style="font-size:22px">Push A</div>
+      <div>
+        <span class="micro" id="trainVolume" style="letter-spacing:.1em">Volume 9,840 kg</span>
+        <div class="acwr">
+          <div class="rail"></div>
+          <div class="zone" style="left:20%; width:46.7%"></div>
+          <div class="flag" style="left:66.7%"><span>1.5</span></div>
+          <div class="knob" id="acwrKnob" style="left:51.3%"></div>
+        </div>
+        <div class="ends">
+          <span class="micro" id="acwrLabel">ACWR 1.27</span>
+          <span class="micro">Spike above 1.5</span>
+        </div>
+      </div>
+      <div class="foot">
+        <span class="src s-hevy"><i></i>Hevy</span>
+        <span class="micro" id="trainFoot">4 days since rest</span>
+      </div>
+    </section>
+    <!-- ───────── sleep consistency ───────── -->
+    <section class="card tile span-4 soon" aria-labelledby="t5">
+      <span class="soonTag">Coming soon</span>
+      <div class="head">
+        <span class="micro" id="t5">Sleep trend</span>
+        <span class="delta flat" id="sleepTrendDelta">—</span>
+      </div>
+      <div class="val" id="sleepTrendVal">—<small> / 7 nights</small></div>
+      <div class="dots" id="sleepTrendDots" aria-label="Nights at or above target, last seven">
+        <i class="dot7"></i><i class="dot7"></i><i class="dot7"></i><i class="dot7"></i>
+        <i class="dot7"></i><i class="dot7"></i><i class="dot7"></i>
+      </div>
+      <div class="microrow">
+        <span class="micro">Typical bedtime <b id="sleepBedtime">—</b></span>
+        <span class="micro">Varies <b id="sleepVariance">—</b></span>
+      </div>
+      <div class="foot">
+        <span class="src s-samsung"><i></i>Samsung Health</span>
+        <span class="micro" id="sleepTargetLabel">target —</span>
+      </div>
+    </section>
+
+  </div>
+
+  <h2 class="groupHead">The record<span>the trends behind it</span></h2>
+
+  <div class="bento">
     <!-- ───────── four tiles ───────── -->
     <section class="card tile span-3" aria-labelledby="t1">
       <div class="head">
@@ -563,52 +686,59 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
       </div>
     </section>
 
-    <section class="card tile span-3" aria-labelledby="t3">
+
+    <!-- ───────── steps ───────── -->
+    <section class="card tile span-3 soon" aria-labelledby="t6">
+      <span class="soonTag">Coming soon</span>
       <div class="head">
-        <span class="micro" id="t3">Yesterday</span>
-        <span class="delta flat" id="trainDelta">RPE 8</span>
+        <span class="micro" id="t6">Steps</span>
+        <span class="delta flat" id="stepsDelta">—</span>
       </div>
-      <div class="val" id="trainTitle" style="font-size:22px">Push A</div>
-      <div>
-        <span class="micro" id="trainVolume" style="letter-spacing:.1em">Volume 9,840 kg</span>
-        <div class="acwr">
-          <div class="rail"></div>
-          <div class="zone" style="left:20%; width:46.7%"></div>
-          <div class="flag" style="left:66.7%"><span>1.5</span></div>
-          <div class="knob" id="acwrKnob" style="left:51.3%"></div>
-        </div>
-        <div class="ends">
-          <span class="micro" id="acwrLabel">ACWR 1.27</span>
-          <span class="micro">Spike above 1.5</span>
-        </div>
+      <div class="val" id="stepsVal">—</div>
+      <div class="bars" id="stepbars" aria-label="Daily steps, last seven days">
+        <div class="baseline" id="stepsBaseline" style="bottom:60%"><span id="stepsBaselineLabel">—</span></div>
+        <div class="bar missing" style="height:100%"></div><div class="bar missing" style="height:100%"></div>
+        <div class="bar missing" style="height:100%"></div><div class="bar missing" style="height:100%"></div>
+        <div class="bar missing" style="height:100%"></div><div class="bar missing" style="height:100%"></div>
+        <div class="bar missing" style="height:100%"></div>
       </div>
       <div class="foot">
-        <span class="src s-hevy"><i></i>Hevy</span>
-        <span class="micro" id="trainFoot">4 days since rest</span>
+        <span class="src s-samsung"><i></i>Samsung Health</span>
+        <span class="micro">7 d average <b id="stepsAvg">—</b></span>
       </div>
     </section>
 
-    <section class="card tile span-3" aria-labelledby="t4">
+    <!-- ───────── energy balance ───────── -->
+    <section class="card tile span-3 soon" aria-labelledby="t7">
+      <span class="soonTag">Coming soon</span>
       <div class="head">
-        <span class="micro" id="t4">Weight trend</span>
-        <span class="delta ok" id="weightDelta">−0.24 kg/wk</span>
+        <span class="micro" id="t7">Energy balance</span>
+        <span class="delta flat" id="kcalDelta">—</span>
       </div>
-      <div class="val" id="weightVal">84.2<small>kg</small></div>
-      <svg class="spark" viewBox="0 0 220 70" role="img"
-           aria-label="Smoothed weight over 30 days, falling from 85.0 to 84.2 kilograms">
-        <path id="weightArea" d="M10,18 L28.2,20.3 L46.4,22 L64.5,24.7 L82.7,27 L100.9,28.7 L119.1,32 L137.3,34.7 L155.5,37 L173.6,40 L191.8,42.7 L210,45.3 L210,58 L10,58 Z"
-              fill="var(--accent-soft)"></path>
-        <polyline id="weightLine" points="10,18 28.2,20.3 46.4,22 64.5,24.7 82.7,27 100.9,28.7 119.1,32 137.3,34.7 155.5,37 173.6,40 191.8,42.7 210,45.3"
-                  fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>
-        <circle id="weightDot" cx="210" cy="45.3" r="4.5" fill="var(--accent)" stroke="var(--bg)" stroke-width="2"></circle>
-        <text x="0" y="12" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9" id="weightHi">85.0</text>
-        <text x="186" y="66" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9" id="weightLo">84.2</text>
-      </svg>
+      <div class="val" id="kcalNet">—<small>kcal</small></div>
+      <!-- Two bars against a shared scale: the comparison is the whole point,
+           so they are drawn on one axis rather than as two numbers to subtract. -->
+      <div class="balance" aria-label="Calories consumed against calories burned">
+        <div class="balRow">
+          <span class="micro">In</span>
+          <span class="balTrack"><span class="balFill in" id="kcalInBar" style="width:0%"></span></span>
+          <b class="micro" id="kcalIn">—</b>
+        </div>
+        <div class="balRow">
+          <span class="micro">Out</span>
+          <span class="balTrack"><span class="balFill out" id="kcalOutBar" style="width:0%"></span></span>
+          <b class="micro" id="kcalOut">—</b>
+        </div>
+      </div>
       <div class="foot">
-        <span class="src s-withings"><i></i>Withings</span>
-        <span class="micro">EWMA · 30 d</span>
+        <span class="src s-mfp"><i></i>MyFitnessPal</span>
+        <span class="micro">7 d average <b id="kcalAvg">—</b></span>
       </div>
     </section>
+
+
+
+
 
     <!-- ───────── check-in ───────── -->
     <section class="card soon checkin span-4" aria-labelledby="ci">
@@ -673,172 +803,6 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
       <div class="sync">
         <span class="row">Last-sync times are not wired up yet.</span>
       </div>
-
-      <div class="feedback">
-        <span class="micro" style="margin-right:4px">Was this useful</span>
-        <button class="fb" type="button" aria-pressed="false">Yes</button>
-        <button class="fb" type="button" aria-pressed="false">No</button>
-      </div>
-    </section>
-
-    <!-- ───────── four tiles ───────── -->
-    <section class="card tile span-3" aria-labelledby="t1">
-      <div class="head">
-        <span class="micro" id="t1">Sleep</span>
-        <span class="delta down" id="sleepDelta">−88 min</span>
-      </div>
-      <div class="val" id="sleepVal">5<small>h</small> 42<small>m</small></div>
-      <div class="bars" id="sleepbars">
-        <div class="baseline" id="sleepBaseline" style="bottom:89.6%"><span id="sleepBaselineLabel">baseline 7h10m</span></div>
-        <div class="bar" style="height:89.2%" data-tip="Fri 29 Aug · 7h08m"></div>
-        <div class="bar" style="height:83.5%" data-tip="Sat 30 Aug · 6h41m"></div>
-        <div class="bar missing" style="height:100%" data-tip="Sun 31 Aug · no data — watch not worn"></div>
-        <div class="bar" style="height:82.5%" data-tip="Mon 1 Sep · 6h36m"></div>
-        <div class="bar" style="height:93.1%" data-tip="Tue 2 Sep · 7h27m"></div>
-        <div class="bar" style="height:77.5%" data-tip="Wed 3 Sep · 6h12m"></div>
-        <div class="bar last" style="height:71.3%" data-tip="Thu 4 Sep · 5h42m"></div>
-      </div>
-      <div class="foot">
-        <span class="src s-samsung"><i></i>Samsung Health</span>
-        <span class="micro">—</span>
-      </div>
-    </section>
-
-    <section class="card tile span-3" aria-labelledby="t2">
-      <div class="head">
-        <span class="micro" id="t2">Resting HR</span>
-        <span class="delta up" id="rhrDelta">+6 bpm</span>
-      </div>
-      <div class="val" id="rhrVal">58<small>bpm</small></div>
-      <svg class="spark" viewBox="0 0 220 70" role="img"
-           aria-label="Resting heart rate over 7 days, rising from 51 to 58 bpm against a 50 to 54 baseline band">
-        <rect id="rhrBand" x="0" y="32" width="220" height="13.3" fill="var(--accent-soft)"></rect>
-        <line id="rhrMedian" x1="0" y1="38.7" x2="220" y2="38.7" stroke="var(--hairline-2)" stroke-width="1" stroke-dasharray="3 4"></line>
-        <polyline id="rhrLine" points="10,42 43,35.3 76,38.7 109,32 142,35.3 175,25.3 208,18.7"
-                  fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>
-        <circle id="rhrDot" cx="208" cy="18.7" r="4.5" fill="var(--accent)" stroke="var(--bg)" stroke-width="2"></circle>
-        <text x="0" y="60" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9" id="rhrLo">51</text>
-        <text x="196" y="60" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9" id="rhrHi">58</text>
-      </svg>
-      <div class="foot">
-        <span class="src s-samsung"><i></i>Samsung Health</span>
-        <span class="micro" id="rhrFoot">Median 52</span>
-      </div>
-    </section>
-
-    <section class="card tile span-3" aria-labelledby="t3">
-      <div class="head">
-        <span class="micro" id="t3">Yesterday</span>
-        <span class="delta flat" id="trainDelta">RPE 8</span>
-      </div>
-      <div class="val" id="trainTitle" style="font-size:22px">Push A</div>
-      <div>
-        <span class="micro" id="trainVolume" style="letter-spacing:.1em">Volume 9,840 kg</span>
-        <div class="acwr">
-          <div class="rail"></div>
-          <div class="zone" style="left:20%; width:46.7%"></div>
-          <div class="flag" style="left:66.7%"><span>1.5</span></div>
-          <div class="knob" id="acwrKnob" style="left:51.3%"></div>
-        </div>
-        <div class="ends">
-          <span class="micro" id="acwrLabel">ACWR 1.27</span>
-          <span class="micro">Spike above 1.5</span>
-        </div>
-      </div>
-      <div class="foot">
-        <span class="src s-hevy"><i></i>Hevy</span>
-        <span class="micro" id="trainFoot">4 days since rest</span>
-      </div>
-    </section>
-
-    <section class="card tile span-3" aria-labelledby="t4">
-      <div class="head">
-        <span class="micro" id="t4">Weight trend</span>
-        <span class="delta ok" id="weightDelta">−0.24 kg/wk</span>
-      </div>
-      <div class="val" id="weightVal">84.2<small>kg</small></div>
-      <svg class="spark" viewBox="0 0 220 70" role="img"
-           aria-label="Smoothed weight over 30 days, falling from 85.0 to 84.2 kilograms">
-        <path id="weightArea" d="M10,18 L28.2,20.3 L46.4,22 L64.5,24.7 L82.7,27 L100.9,28.7 L119.1,32 L137.3,34.7 L155.5,37 L173.6,40 L191.8,42.7 L210,45.3 L210,58 L10,58 Z"
-              fill="var(--accent-soft)"></path>
-        <polyline id="weightLine" points="10,18 28.2,20.3 46.4,22 64.5,24.7 82.7,27 100.9,28.7 119.1,32 137.3,34.7 155.5,37 173.6,40 191.8,42.7 210,45.3"
-                  fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>
-        <circle id="weightDot" cx="210" cy="45.3" r="4.5" fill="var(--accent)" stroke="var(--bg)" stroke-width="2"></circle>
-        <text x="0" y="12" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9" id="weightHi">85.0</text>
-        <text x="186" y="66" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9" id="weightLo">84.2</text>
-      </svg>
-      <div class="foot">
-        <span class="src s-withings"><i></i>Withings</span>
-        <span class="micro">EWMA · 30 d</span>
-      </div>
-    </section>
-
-    <!-- ───────── check-in ───────── -->
-    <section class="card soon checkin span-4" aria-labelledby="ci">
-      <span class="soonTag">Coming soon</span>
-      <span class="micro" id="ci">Check-in</span>
-      <div class="sliders" aria-hidden="true">
-        <div class="slider"><span class="lbl">Energy</span>
-          <span class="pips"><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip"></i><i class="pip"></i></span></div>
-        <div class="slider"><span class="lbl">Sleep quality</span>
-          <span class="pips"><i class="pip on"></i><i class="pip on"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></div>
-        <div class="slider"><span class="lbl">Stress</span>
-          <span class="pips"><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip"></i></span></div>
-      </div>
-      <div>
-        <span class="micro" style="display:block; margin-bottom:9px">Tags · 13 available</span>
-        <div class="tags">
-          <button class="tag" type="button" aria-pressed="true">Late screen</button>
-          <button class="tag" type="button" aria-pressed="true">Work stress</button>
-          <button class="tag" type="button" aria-pressed="false">Alcohol</button>
-          <button class="tag" type="button" aria-pressed="false">Late meal</button>
-          <button class="tag" type="button" aria-pressed="false">No watch</button>
-          <button class="tag" type="button" aria-pressed="false">Travel</button>
-          <button class="tag" type="button" aria-pressed="false">Illness</button>
-        </div>
-      </div>
-      <button class="cta" type="button">Check in · about 25 seconds</button>
-      <div class="foot">
-      </div>
-    </section>
-
-    <!-- ───────── supplements ───────── -->
-    <section class="card soon span-4" aria-labelledby="sp">
-      <span class="soonTag">Coming soon</span>
-      <span class="micro" id="sp">Supplements</span>
-      <div class="stack">
-        <button class="supp" type="button" aria-pressed="true"><span class="box" aria-hidden="true">✓</span><span class="nm">Fish oil</span><span class="dose">4 softgels</span></button>
-        <button class="supp" type="button" aria-pressed="true"><span class="box" aria-hidden="true">✓</span><span class="nm">Multivitamin</span><span class="dose">2 tablets</span></button>
-        <button class="supp" type="button" aria-pressed="true"><span class="box" aria-hidden="true">✓</span><span class="nm">Vitamin D3</span><span class="dose">4,000 IU</span></button>
-        <button class="supp" type="button" aria-pressed="false"><span class="box" aria-hidden="true">✓</span><span class="nm">Vitamin C</span><span class="dose">1,000 mg</span></button>
-        <button class="supp" type="button" aria-pressed="false"><span class="box" aria-hidden="true">✓</span><span class="nm">Creatine</span><span class="dose">6 g</span></button>
-        <button class="supp" type="button" aria-pressed="false"><span class="box" aria-hidden="true">✓</span><span class="nm">Beta-alanine</span><span class="sched">Pre-workout</span></button>
-        <button class="supp" type="button" aria-pressed="false"><span class="box" aria-hidden="true">✓</span><span class="nm">Magnesium complex</span><span class="sched">Bedtime</span></button>
-      </div>
-    </section>
-
-    <!-- ───────── what the system cannot see ───────── -->
-    <section class="card soon span-4" aria-labelledby="dh">
-      <span class="soonTag">Coming soon</span>
-      <span class="micro" id="dh">Not measured</span>
-      <div class="gaps">
-        <div class="gap">
-          <span class="micro">HRV</span>
-          <span class="em">—</span>
-          <span class="note">Not exposed by this device. Readiness runs on the fallback formula.</span>
-        </div>
-        <div class="gap">
-          <span class="micro">Protein g/kg</span>
-          <span class="em">—</span>
-          <span class="note">MyFitnessPal does not sync macros. Open item O2.</span>
-        </div>
-      </div>
-      <div class="sync">
-        <span class="row"><i style="background:#5B93D6"></i>Samsung Health <b>06:10</b></span>
-        <span class="row"><i style="background:#D9803F"></i>Hevy <b>06:12</b></span>
-        <span class="row"><i style="background:#4FB3C4"></i>Withings <b>06:14</b></span>
-        <span class="row"><i style="background:#8AA83F"></i>MyFitnessPal <b>05:58</b></span>
-      </div>
     </section>
 
   </div>
@@ -897,9 +861,9 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     if (e.target.closest && e.target.closest('[data-tip]')) tip.style.opacity = '0';
   });
 
-  /* The intro roll-up animation was removed with the example mornings: it
-     counted #score up to a hard-coded 62, which is a fabricated readiness
-     score on a screen that renders live data the moment it loads. */
+  /* The intro roll-up went with the examples: it counted #score to a
+     hard-coded 62, which on a live-only screen is a fabricated readiness
+     score and nothing else. */
   window.__glacierScoreAnim = {cancelled: true};
 })();
 </script>
@@ -921,35 +885,37 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
   var ARC_LENGTH = 477.5;          // 2 * PI * r, r = 76
   var ARC_SWEEP  = 358.1;          // 270 degrees of it
   var SLEEP_SCALE_MIN = 480;       // full height of a sleep bar
-  /* The last seven nights ending today, rather than a week frozen in August. */
+  /* The last seven nights ending today, not a week frozen in August. */
   var DAYS = (function(){
     var out = [], d;
-    for (var i = 6; i >= 0; i--) {
-      d = new Date(); d.setDate(d.getDate() - i);
-      out.push(pad2(d.getDate()) + '-' + pad2(d.getMonth() + 1));
-    }
+    for (var i = 6; i >= 0; i--) { d = new Date(); d.setDate(d.getDate() - i);
+      out.push(pad2(d.getDate()) + '-' + pad2(d.getMonth() + 1)); }
     return out;
   })();
 
-  /* The four hand-written mornings that used to live here — accumulating,
-     nothing unusual, overreached, watch not worn — were the design's proof
-     while there was no real data. There is real data now, and example data on
-     a screen meant to show what is yours is worse than useless. They are in
-     git history if the states ever need drawing again.
-
-     `live` is populated by loadLive() and is the only scenario. */
+  /* The four hand-written mornings that lived here — accumulating, nothing
+     unusual, overreached, watch not worn — were the design's proof while
+     there was no real data. There is real data now, and an example on a
+     screen meant to show what is yours is worse than a blank. They are in git
+     history if the states ever need drawing again. */
   var SCENARIOS = {};
 
   var STATUS_COLOUR = {green: 'var(--good)', amber: 'var(--warn)', red: 'var(--crit)', none: 'var(--ink-3)'};
 
   function pad2(n){ return String(n).padStart(2, '0'); }
 
-  /* DD-MM-YYYY throughout. The API speaks ISO (YYYY-MM-DD) because that sorts
-     and parses unambiguously; the screen speaks the format its reader uses. */
+  /* DD-MM-YYYY on screen. The API keeps ISO because it sorts and parses
+     unambiguously; only the reader's format changes. */
   function ukDate(iso){
     if (!iso) return '—';
-    var parts = String(iso).slice(0, 10).split('-');
-    return parts.length === 3 ? parts[2] + '-' + parts[1] + '-' + parts[0] : String(iso);
+    var q = String(iso).slice(0, 10).split('-');
+    return q.length === 3 ? q[2] + '-' + q[1] + '-' + q[0] : String(iso);
+  }
+
+  function status(text){
+    var el = document.getElementById('liveStatus');
+    if (!el) return;
+    el.hidden = !text; el.textContent = text || '';
   }
 
   function $(id){ return document.getElementById(id); }
@@ -1226,8 +1192,8 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
 
   function renderHeader(d){
     set('headerDate', ukDate(d.date));
-    var phase = d.phase ? String(d.phase) : '';
-    set('phaseText', phase ? phase.charAt(0).toUpperCase() + phase.slice(1) : '—');
+    var ph = d.phase ? String(d.phase) : '';
+    set('phaseText', ph ? ph.charAt(0).toUpperCase() + ph.slice(1) : '—');
   }
 
   function liveScenario(d){
@@ -1291,13 +1257,6 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
       },
       weight: {series: [], delta: 'no data', deltaClass: 'flat'}
     };
-  }
-
-  function status(text){
-    var el = $('liveStatus');
-    if (!el) return;
-    el.hidden = !text;
-    el.textContent = text || '';
   }
 
   function loadLive(){

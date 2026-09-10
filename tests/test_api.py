@@ -266,3 +266,19 @@ def test_ui_route_is_not_cached(client):
 def test_today_still_requires_a_token(client):
     """The page being open must not make the data open."""
     assert client.get("/api/v1/today").status_code == 401
+
+
+def test_ui_has_no_duplicated_markup(client):
+    """Every id on the page must be unique.
+
+    A splice while removing the design-language section once duplicated the
+    entire tile block. The page still looked plausible — the second copy kept
+    its hand-written values, so it read as a second set of real tiles sitting
+    under the live ones. getElementById returns the first match, so the JS
+    updated one copy and left the other showing example data. Nothing threw.
+    """
+    import re
+
+    ids = re.findall(r'\bid="([^"]+)"', client.get("/ui").text)
+    duplicates = sorted({i for i in ids if ids.count(i) > 1})
+    assert not duplicates, f"duplicated ids: {duplicates}"
