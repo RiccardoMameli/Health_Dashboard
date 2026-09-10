@@ -6,6 +6,132 @@ of each working session.
 
 ---
 
+## 10 September 2026 — the Hevy adapter, verified against the real API
+
+**The first session with real data in it.** 274 workouts, 4331 sets, 31 July
+2023 to 8 September 2026. The adapter had only ever been checked against a
+hand-written fixture; this replaces that with the account's own history and
+fixes what the comparison exposed. 139 tests passing.
+
+### Where the project stands
+
+- **Keys held: Hevy only.** No Withings, Supabase, Anthropic or Resend.
+- Overnight watch wear is patchy; the Samsung Health export has not been run.
+- Nothing is deployed.
+- **Phase 1's gate is still open.** It needs seven consecutive days of
+  check-ins *and* a full Hevy and Withings import. Hevy's history is now
+  proven importable but has not been imported into a real database, and
+  Withings cannot start without credentials. The gate is blocked on key
+  collection and a host, not on code.
+
+### The build environment cannot reach Hevy
+
+`api.hevyapp.com` is refused at this environment's egress proxy (403 to
+CONNECT). Not a code fault and not something to route around, so the
+verification runs on the owner's machine instead. `scripts/verify_hevy.py`
+exists for that: it packages the whole check — count against
+`/v1/workouts/count`, field-by-field conformance across the entire history,
+the volume arithmetic reproduced by hand, date attribution near midnight and
+across a BST/GMT boundary — so it produces the same report wherever it runs,
+and captures a scrubbed fixture with `--write-fixture`.
+
+That split is worth keeping in mind for Phase 3: **anything needing a real
+credential has to run somewhere the credential and the network both are.**
+
+### What the real payload said
+
+Every field the adapter reads exists on every record, with the shape it
+expects. The count agrees at 274, there are no duplicate ids, and the volume
+hand-check reproduces exactly: 20290.0 both ways on the 7 April legs session,
+with 500.0 of warm-up excluded.
+
+Three places reality differed from the fixture, and one from the spec:
+
+1. **Timestamps carry `+00:00`, not `Z`.** The adapter handled both; the
+   fixture had been testing a format the account never sends.
+2. **`description` and `notes` are `""`, never null.**
+3. **`weight_kg` is null on 463 of 4331 sets** — 11%, all bodyweight work.
+4. **The published OpenAPI spec is wrong.** It documents `supersets_id`; the
+   API sends `superset_id`. Nothing reads it, but it is a reminder that the
+   spec is not the territory, which is the whole reason this was checked
+   against the live API.
+
+### The finding that mattered
+
+**RPE was null on all 4331 sets.** The owner had never logged it. So
+`session_load`'s primary `duration x RPE` branch was unreachable, and three
+years of training load came entirely from the volume fallback — with
+`Workout.perceived_exertion_1_10` never written by anything, so even a
+logged RPE would have gone nowhere.
+
+That is worse than "the second-choice definition". Volume load is dominated
+by absolute weight, so it systematically overweights machine leg work:
+
+| Session | Volume load | As duration x RPE |
+|---|---|---|
+| Upper body, 8 Sep (39 min) | 5024 kg → 50 units | ~313 units |
+| Legs, 7 Apr | 20290 kg → 203 units | ~320 units |
+
+Volume ranks the leg day four times harder. It was not. The signal driving
+ACWR — and through it readiness — has largely been *"did he train legs?"*
+rather than *"how hard did he train?"*. Compounding it, **136 of 274 sessions
+(half) contain unweighted sets volume cannot see at all.**
+
+The owner has started logging RPE as a result. That is the fix; no estimation
+of bodyweight loads is planned, because `duration x RPE` does not care
+whether the load was external, and an estimate built from a bodyweight series
+that does not exist yet would be machinery producing a guess.
+
+### Changes
+
+- **Session RPE is aggregated and stored** — the mean of working sets that
+  carry one, warm-ups excluded. Not Foster's sRPE; close enough to drive the
+  same formula and what per-set logging supports.
+- **`_volume_kg` returns None, not 0.0**, when no working set has both a
+  weight and reps. Its own docstring said an unquantifiable session must not
+  count as zero load; the guard was defeated by the adapter never producing a
+  None. As it happens **0 of 274 sessions hit this** — a latent bug, not a
+  live one, and worth fixing before a bodyweight-only session abroad finds it.
+- **Blank descriptions store as null.**
+- **ACWR is withheld across a change of load definition.** The fortnight after
+  RPE logging starts, the acute window is RPE-based while the chronic window
+  is still volume-based, so the ratio measures the units changing rather than
+  the training. Simulated on the real training shape: ACWR 2.80 in week one
+  (a full 9-point readiness penalty), 1.75 in week two, back to normal by
+  week four. Two weeks of the score marked down for a spike that never
+  happened, and a brief obliged to explain it — R2 arriving through the back
+  door of a units change. `acwr` now takes a per-day set of load bases and
+  declines when the chronic window holds more than one, which is the pattern
+  it already used for a too-short window or a zero chronic load.
+- **The fixture is eight real scrubbed workouts**, chosen to carry between
+  them a warm-up, bodyweight sets, fractional weights, a near-midnight start,
+  and one session each from GMT and BST. The six fixture-based tests are
+  rewritten against real numbers, and the delete test now proves the other
+  seven survive — something a one-workout fixture could not test.
+
+### Two process notes
+
+The first version of `verify_hevy.py` **crashed on Windows** before printing
+anything useful: PowerShell writes cp1252, Hevy titles carry emoji, and the
+volume hand-check prints titles through `repr()`. Reproduced under
+`PYTHONIOENCODING=cp1252` and fixed by forcing UTF-8 on stdout. The report
+died on a decorative character rather than on anything it measured.
+
+The raw report files were committed alongside the fixture by accident. They
+carry the **unscrubbed** payload — real ids, titles and notes — which defeats
+the point of scrubbing the fixture beside them. Removed and gitignored; they
+remain in the history of `caba164`, which is cosmetic in a private repo but
+worth knowing.
+
+### Next
+
+Withings needs credentials before Phase 1's gate can move, and the Hevy
+import needs somewhere to run with both the key and network access. The
+readiness score has still never seen real data end to end — every number in
+it remains checked against fixtures and simulation.
+
+---
+
 ## 3 September 2026 — UI preview made deployable and explorable
 
 `docs/ui/glacier-today.html` now renders from a data object rather than fixed

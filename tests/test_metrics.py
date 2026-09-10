@@ -23,6 +23,8 @@ from app.metrics.baselines import (
     z_score,
 )
 from app.metrics.derived import (
+    LOAD_BASIS_RPE,
+    LOAD_BASIS_VOLUME,
     acute_load,
     acwr,
     acwr_penalty,
@@ -31,6 +33,7 @@ from app.metrics.derived import (
     data_completeness_pct,
     protein_g_per_kg,
     session_load,
+    session_load_and_basis,
     sleep_debt,
     sleep_midpoint_variance,
     volume_progression_slope,
@@ -243,3 +246,68 @@ def test_acwr_withheld_when_the_chronic_window_is_nearly_empty():
     # Once training is regular, the ratio means something again.
     regular = [480.0 if day % 2 else 0.0 for day in range(28)]
     assert acwr(regular) is not None
+
+
+# --- the load-definition changeover ------------------------------------------
+#
+# The account logged no RPE at all for its first three years (4331 sets, every
+# one null), so all of its load came from volume. Logging started on 10 Sep
+# 2026. These tests cover the month where the two definitions overlap, because
+# that month is where ACWR would otherwise report a spike that never happened.
+
+VOL = {LOAD_BASIS_VOLUME}
+RPE = {LOAD_BASIS_RPE}
+
+
+def test_session_load_reports_which_definition_it_used():
+    load, basis = session_load_and_basis(duration_min=39.1, rpe=9.0, volume_kg=5024.0)
+    assert (load, basis) == (pytest.approx(351.9), LOAD_BASIS_RPE)
+
+    load, basis = session_load_and_basis(duration_min=39.1, rpe=None, volume_kg=5024.0)
+    assert (load, basis) == (pytest.approx(50.24), LOAD_BASIS_VOLUME)
+
+    # Neither: an unquantifiable session has no load and no basis.
+    assert session_load_and_basis(duration_min=39.1, rpe=None, volume_kg=None) == (None, None)
+
+
+def test_acwr_is_unchanged_when_no_bases_are_supplied():
+    """The guard is opt-in, so every existing caller keeps its behaviour."""
+    loads = [10.0] * 28
+    assert acwr(loads) == pytest.approx(1.0)
+    assert acwr(loads, daily_bases=[VOL] * 28) == pytest.approx(1.0)
+
+
+def test_acwr_is_withheld_while_the_window_mixes_definitions():
+    """The week RPE logging starts. Volume said ~50 for these sessions and
+    duration x RPE says ~350, so the ratio would read about 6 — saturating a
+    penalty scale that tops out at 1.8 — while nothing about the training
+    changed. Withheld is the only honest answer."""
+    loads = [50.0] * 21 + [350.0] * 7
+    bases = [VOL] * 21 + [RPE] * 7
+    assert acwr(loads) is not None  # unguarded, it happily reports the artefact
+    assert acwr(loads, daily_bases=bases) is None
+
+
+def test_acwr_returns_once_the_window_is_uniform_again():
+    """It resolves itself: 28 days after the changeover the chronic window is
+    all RPE-based and the ratio is meaningful again, on the better definition."""
+    loads = [350.0] * 28
+    assert acwr(loads, daily_bases=[RPE] * 28) == pytest.approx(1.0)
+
+
+def test_rest_days_do_not_count_as_a_definition():
+    """A rest day contributes an empty set, not a third basis — otherwise
+    every window containing a rest day would look mixed and ACWR would never
+    report at all."""
+    loads = [0.0 if i % 3 == 0 else 50.0 for i in range(28)]
+    bases = [set() if i % 3 == 0 else VOL for i in range(28)]
+    assert acwr(loads, daily_bases=bases) is not None
+
+
+def test_a_single_mixed_day_deep_in_the_window_still_withholds():
+    """One session logged with an RPE 27 days ago is enough to make the
+    chronic sum a mixture of two units. Partial contamination is still
+    contamination."""
+    bases = [VOL] * 28
+    bases[0] = RPE
+    assert acwr([50.0] * 28, daily_bases=bases) is None

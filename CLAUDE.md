@@ -16,7 +16,11 @@ supplement APIs, data health.
 Phase 2 code complete: metrics engine (`app/metrics/`, pure functions),
 readiness score, the DB assembler (`app/services/metrics_engine.py`), the
 daily brief with its traceability guard (`app/ai/`), email delivery, and the
-06:30 job (`scripts/daily_brief.py`). 126 tests passing.
+06:30 job (`scripts/daily_brief.py`). 139 tests passing.
+
+The Hevy adapter is verified against the live API (10 Sep 2026, 274 workouts)
+and its fixture is real scrubbed data. Nothing else is: Withings, the metrics
+engine and the readiness score have still only ever seen fixtures.
 
 Phase 2's *gate* is not met and cannot be met by writing code: it needs seven
 consecutive days of an accurate brief against real data. Same for Phase 1's
