@@ -23,7 +23,7 @@ from datetime import date as Date
 from datetime import datetime, timedelta
 from statistics import median
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
@@ -389,6 +389,17 @@ def compute_day(session: Session, day: Date, settings: Settings | None = None) -
     out.acwr = acwr(loads, daily_bases=load_bases)
     stimuli, medians = _muscle_stimuli(session, utcnow())
     out.muscle_recovery = muscle_recovery(stimuli, median_volumes=medians)
+    # An empty figure has three quite different causes and the screen cannot
+    # tell them apart from the rows alone: no exercise has been mapped to a
+    # muscle group yet, the catalogue is mapped but nothing was trained inside
+    # the lookback, or there is simply no training history. Saying which is
+    # the difference between a setup step and a fortnight off.
+    if stimuli:
+        out.muscle_recovery_status = "ok"
+    elif session.execute(select(func.count(ExerciseTemplate.id))).scalar_one() == 0:
+        out.muscle_recovery_status = "unmapped"
+    else:
+        out.muscle_recovery_status = "no_recent_training"
     out.load_quality = load_quality(load_bases)
     out.load_quality_note = load_quality_note(out.load_quality)
     out.days_since_rest = _days_since_rest(session, daytime)

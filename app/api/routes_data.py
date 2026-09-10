@@ -128,6 +128,7 @@ def today(session: Session = Depends(db)) -> dict:
             "load_quality_note": computed.load_quality_note,
             "days_since_rest": computed.days_since_rest,
             "muscle_recovery": [m.as_dict() for m in computed.muscle_recovery],
+            "muscle_recovery_status": computed.muscle_recovery_status,
         },
         "brief": (
             {

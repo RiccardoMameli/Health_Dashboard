@@ -1310,12 +1310,17 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
       }
       if (r && r.state !== 'unknown') known++;
     });
-    /* Nothing resolved means the exercise catalogue has not been synced — a
-       setup step, not a fortnight off. An all-grey body would read as the
-       second. */
-    set('bodyNote', known === 0
-      ? 'No exercises mapped yet — run scripts/sync_exercise_templates.py.'
-      : 'Recovery windows are population estimates, not measurements of you.');
+    /* An empty figure has three causes and they mean opposite things: a setup
+       step not done, a genuine rest period, or no history at all. Saying which
+       matters — an all-grey body otherwise reads as a fortnight off. */
+    var NOTES = {
+      ok: 'Recovery windows are population estimates, not measurements of you.',
+      unmapped: 'Your exercises have not been matched to muscle groups yet. ' +
+                'Run the exercise sync once and this fills in.',
+      no_recent_training: 'No sessions in the last 14 days, so there is nothing ' +
+                'to show recovering.'
+    };
+    set('bodyNote', NOTES[s.muscleRecoveryStatus] || NOTES.ok);
   }
 
   function renderHeader(d){
@@ -1384,6 +1389,7 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
           : training.days_since_rest + ' days since rest'
       },
       muscleRecovery: (d.training && d.training.muscle_recovery) || [],
+      muscleRecoveryStatus: (d.training && d.training.muscle_recovery_status) || 'unmapped',
       weight: {series: [], delta: 'no data', deltaClass: 'flat'}
     };
   }
