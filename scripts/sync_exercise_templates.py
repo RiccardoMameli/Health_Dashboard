@@ -37,17 +37,25 @@ def main() -> int:
             select(func.count(func.distinct(WorkoutSet.exercise_template_id)))
         ).scalar_one()
         cached = session.execute(select(func.count(ExerciseTemplate.id))).scalar_one()
+    todo = distinct - cached
     print(f"{distinct} distinct exercises in your history, {cached} already resolved")
+    if todo > 0:
+        print(f"Fetching {todo}, one request each and throttled — roughly {todo * 0.4:.0f}s.")
+        print("Progress is saved as it goes, so an interrupted run resumes where it stopped.\n")
+
+    def show(index: int, total: int) -> None:
+        print(f"\r  {index}/{total}", end="", flush=True)
 
     try:
         with session_scope() as session:
             with sync_run(session, "hevy") as run:
-                result = HevyAdapter().sync_exercise_templates(session)
+                result = HevyAdapter().sync_exercise_templates(session, progress=show)
                 run.records_ingested = result.records_ingested
     except Exception as exc:
         print(f"  FAILED: {type(exc).__name__}: {exc}")
         return 1
 
+    print()
     print(f"  resolved {result.records_ingested}, skipped {result.records_skipped}")
     for note in result.notes:
         print(f"  note: {note}")

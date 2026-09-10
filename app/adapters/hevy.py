@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from datetime import date as Date
 from datetime import datetime
 from typing import Any
@@ -33,6 +34,11 @@ SOURCE = "hevy"
 PAGE_SIZE = 10  # API maximum for /v1/workouts
 REQUEST_DELAY_SEC = 0.35
 MAX_RETRIES = 5
+
+#: Templates are committed in batches so an interrupted run keeps what it
+#: already fetched and a re-run resumes from there. Small enough that little is
+#: lost, large enough not to commit on every request.
+TEMPLATE_COMMIT_EVERY = 20
 
 
 def _parse_dt(value: str | None) -> datetime | None:
@@ -308,7 +314,9 @@ class HevyAdapter(Adapter):
         result.records_ingested += 1
         return workout
 
-    def sync_exercise_templates(self, session: Session) -> SyncResult:
+    def sync_exercise_templates(
+        self, session: Session, *, progress: Callable[[int, int], None] | None = None
+    ) -> SyncResult:
         """Resolve every exercise id in the history to its muscle groups.
 
         Hevy serves templates one at a time, so this walks the distinct ids
@@ -319,6 +327,13 @@ class HevyAdapter(Adapter):
         Already-cached ids are skipped, so re-running costs nothing. A template
         that 404s is recorded as a miss and not retried into a failure: a
         deleted custom exercise should not stop the other fifty resolving.
+
+        Progress is committed every TEMPLATE_COMMIT_EVERY templates rather than
+        once at the end. A real account has well over a hundred distinct
+        exercises, which at the throttle above is a minute of silence; holding
+        all of it in one transaction meant an interrupted run — or one failed
+        request on the hundred-and-sixtieth — threw away everything before it.
+        Committing as it goes also makes a re-run resume rather than restart.
         """
         result = SyncResult(source=SOURCE)
         known = set(session.execute(select(ExerciseTemplate.id)).scalars())
@@ -331,7 +346,10 @@ class HevyAdapter(Adapter):
             ).scalars()
             if i not in known
         ]
-        for template_id in ids:
+        total = len(ids)
+        for index, template_id in enumerate(ids, start=1):
+            if progress is not None:
+                progress(index, total)
             try:
                 payload = self.client.get(f"/v1/exercise_templates/{template_id}")
             except httpx.HTTPStatusError as exc:
@@ -360,6 +378,8 @@ class HevyAdapter(Adapter):
                 )
             )
             result.records_ingested += 1
+            if result.records_ingested % TEMPLATE_COMMIT_EVERY == 0:
+                session.commit()
             time.sleep(REQUEST_DELAY_SEC)
         session.flush()
         return result
