@@ -825,6 +825,65 @@ Chat over your own data. Predictive readiness. iOS target. Local LLM inference o
 
 ---
 
+### 14.1 Deferred features — recorded, not scheduled
+
+Recorded here so they are not lost and not started early. R7 (scope creep) is
+the most likely way this project dies, and the phase gates exist to stop
+exactly this list being worked on before the core loop is proven.
+
+#### F1 — Per-muscle-group recovery view (raised 10 Sep 2026)
+
+A body figure on the Training screen shading each muscle group by how recently
+and how hard it was trained, so a glance says what is ready to be worked
+again. Optionally attenuated by non-gym load — steps and stairs climbed.
+
+**The data is largely already there.** `workout_sets.exercise_template_id` is
+stored and indexed on every set — 4331 of them across the imported history —
+and Hevy's `GET /v1/exercise_templates/{id}` returns `primary_muscle_group`
+and `secondary_muscle_groups` over a fixed 20-value enum (abdominals,
+shoulders, biceps, triceps, forearms, quadriceps, hamstrings, calves, glutes,
+abductors, adductors, lats, upper_back, traps, lower_back, chest, cardio,
+neck, full_body, other). Resolving them is a one-off fetch of the distinct
+templates in the history, cached in a table; nothing needs re-importing. So
+**per-muscle-group working volume per day is computable from data already
+held**, and that is the honest half of the feature.
+
+**Steps and stairs are not there.** Both come from Health Connect, which is
+Phase 3 and needs the companion app. Until then the non-gym half cannot be
+built at all.
+
+**The part that needs care.** "Chest: 60% recovered" is a number that reads as
+measured and is not. Recovery rate varies with proximity to failure, training
+age, absolute volume, sleep, nutrition and age, and the published ranges
+(roughly 24–48h for small muscle groups, 48–72h+ for large or
+eccentric-heavy work) are population estimates, not measurements of this
+user. A single confident percentage per muscle is exactly the confident
+fabrication §2.2 C2 exists to prevent — it would simply be arriving from a
+lookup table instead of from a model.
+
+The honest version shows the facts and labels the estimate as one:
+
+- **hours since last stimulus** and **working-set volume applied**, per group —
+  both measured, both from data already held;
+- the recovery window as a **named reference band** ("typically 48–72h"), drawn
+  as a band rather than collapsed into a number, and stated on the screen as a
+  population figure rather than a personal one;
+- no single "% recovered" scalar, and no training recommendation derived from
+  it during `baseline`.
+
+**The route to making it real.** Adding per-region soreness to the check-in
+(§7.2) would give the N-of-1 experiment engine something to calibrate against:
+his own reported soreness versus time-since-stimulus, per group, over months.
+That converts the feature from a lookup table into a measurement of him, and
+is the only version that could honestly report a personal recovery time. It
+belongs with the experiment engine, not before it.
+
+**Earliest sensible phase: 4** (screens), with the steps and stairs half
+gated on Phase 3, and the calibrated version on Phase 5. Not to be started
+while Phase 1's and Phase 2's gates are open.
+
+---
+
 ## 15. Risks
 
 | # | Risk | Likelihood | Impact | Mitigation |
@@ -852,6 +911,7 @@ Chat over your own data. Predictive readiness. iOS target. Local LLM inference o
 | O1 | Expo one-codebase vs Next.js (§4.2) | Phase 1 | **Resolved 3 Sep 2026: Expo** |
 | O2 | MyFitnessPal: stay, switch, or Premium monthly import (§3.4) | Phase 3 | **Provisionally: stay on MFP, calories only. Revisit.** |
 | O3 | Sleep target for sleep-debt calculation | Phase 2 | **Resolved 3 Sep 2026: 7h30** |
+| O4 | Per-muscle-group recovery view (§14.1 F1) | Phase 4 | **Recorded 10 Sep 2026, not scheduled.** Muscle groups resolvable from Hevy templates today; steps/stairs need Phase 3; the per-muscle percentage needs check-in soreness and Phase 5 to be honest. |
 
 ---
 
