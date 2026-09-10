@@ -6,122 +6,129 @@ of each working session.
 
 ---
 
-## 10 September 2026 — status check, and the first attempt at real Hevy data
+## 10 September 2026 — the Hevy adapter, verified against the real API
 
-**No application code changed.** Environment set up, migrations and seed run
-against a local SQLite database, and the Hevy adapter audited against the
-published API specification. **The real import did not happen** — two blockers,
-below.
+**The first session with real data in it.** 274 workouts, 4331 sets, 31 July
+2023 to 8 September 2026. The adapter had only ever been checked against a
+hand-written fixture; this replaces that with the account's own history and
+fixes what the comparison exposed. 139 tests passing.
 
-### Where the project actually stands
+### Where the project stands
 
-- Repo unchanged since the two commits of 3 September; both are now on GitHub.
 - **Keys held: Hevy only.** No Withings, Supabase, Anthropic or Resend.
-- Overnight watch wear is patchy, and the one-off Samsung Health export has
-  still not been run.
+- Overnight watch wear is patchy; the Samsung Health export has not been run.
 - Nothing is deployed.
-- **Phase 1's acceptance gate is not passed** and has not moved: it needs seven
-  consecutive days of check-ins plus a full, correct Hevy and Withings import.
-  Withings cannot start at all without its credentials, so the gate is blocked
-  on key collection, not on code.
+- **Phase 1's gate is still open.** It needs seven consecutive days of
+  check-ins *and* a full Hevy and Withings import. Hevy's history is now
+  proven importable but has not been imported into a real database, and
+  Withings cannot start without credentials. The gate is blocked on key
+  collection and a host, not on code.
 
-Phase 0's gate is likewise still half-met — schema builds, no production
-health check — for the same reason.
+### The build environment cannot reach Hevy
 
-### Local environment
+`api.hevyapp.com` is refused at this environment's egress proxy (403 to
+CONNECT). Not a code fault and not something to route around, so the
+verification runs on the owner's machine instead. `scripts/verify_hevy.py`
+exists for that: it packages the whole check — count against
+`/v1/workouts/count`, field-by-field conformance across the entire history,
+the volume arithmetic reproduced by hand, date attribution near midnight and
+across a BST/GMT boundary — so it produces the same report wherever it runs,
+and captures a scrubbed fixture with `--write-fixture`.
 
-Python 3.11.15, `.venv`, `pip install -e ".[dev]"`. `alembic upgrade head`
-builds all 20 tables on SQLite; the seed creates the eight-item supplement
-stack. 126 tests pass, `ruff check app tests` clean. `.env` written with
-`DATABASE_URL=sqlite+pysqlite:///./health.db` and every key left blank.
+That split is worth keeping in mind for Phase 3: **anything needing a real
+credential has to run somewhere the credential and the network both are.**
 
-### Blocker 1 — the Hevy API is not reachable from the build environment
+### What the real payload said
 
-`api.hevyapp.com` is refused at the egress proxy (403 to CONNECT). This is an
-environment policy, not a code fault and not something to route around, so the
-"verify against the real API rather than the fixture" work cannot be done from
-here regardless of the key. It needs either a host that can reach the API or a
-scrubbed real response captured elsewhere and committed as the fixture.
+Every field the adapter reads exists on every record, with the shape it
+expects. The count agrees at 274, there are no duplicate ids, and the volume
+hand-check reproduces exactly: 20290.0 both ways on the 7 April legs session,
+with 500.0 of warm-up excluded.
 
-### Blocker 2 — the key is not in the environment
+Three places reality differed from the fixture, and one from the spec:
 
-`.env` carries `HEVY_API_KEY=` with a comment saying where to paste it. Until
-it is set the backfill fails, which it did:
+1. **Timestamps carry `+00:00`, not `Z`.** The adapter handled both; the
+   fixture had been testing a format the account never sends.
+2. **`description` and `notes` are `""`, never null.**
+3. **`weight_kg` is null on 463 of 4331 sets** — 11%, all bodyweight work.
+4. **The published OpenAPI spec is wrong.** It documents `supersets_id`; the
+   API sends `superset_id`. Nothing reads it, but it is a reminder that the
+   spec is not the territory, which is the whole reason this was checked
+   against the live API.
 
-```
-=== hevy backfill ===
-  FAILED: RuntimeError: HEVY_API_KEY is not set
-```
+### The finding that mattered
 
-Worth recording that this is the *correct* failure. The `sync_runs` table has
-the row — `status=failed`, `error_message=RuntimeError: HEVY_API_KEY is not
-set` — rather than a silent skip. That is the R6 failure mode the 3 September
-session fixed, verified against a real missing key for the first time.
+**RPE was null on all 4331 sets.** The owner had never logged it. So
+`session_load`'s primary `duration x RPE` branch was unreachable, and three
+years of training load came entirely from the volume fallback — with
+`Workout.perceived_exertion_1_10` never written by anything, so even a
+logged RPE would have gone nowhere.
 
-### What the audit against the OpenAPI spec found
+That is worse than "the second-choice definition". Volume load is dominated
+by absolute weight, so it systematically overweights machine leg work:
 
-The adapter was checked field by field against the published Hevy
-specification. This is weaker than a real response but stronger than the
-hand-written fixture, which is the only thing it had been checked against.
+| Session | Volume load | As duration x RPE |
+|---|---|---|
+| Upper body, 8 Sep (39 min) | 5024 kg → 50 units | ~313 units |
+| Legs, 7 Apr | 20290 kg → 203 units | ~320 units |
 
-**Every field the adapter reads exists with the name and shape it expects.**
-Envelope (`workouts`, `events`, `page_count`), workout (`id`, `title`,
-`description`, `start_time`, `end_time`, `exercises`), exercise (`title`,
-`exercise_template_id`, `sets`) and set (`index`, `type`, `weight_kg`, `reps`,
-`rpe`, `distance_meters`, `duration_seconds`) all match, as do the `updated`
-and `deleted` event shapes. The `pageSize` cap of 10 is confirmed.
+Volume ranks the leg day four times harder. It was not. The signal driving
+ACWR — and through it readiness — has largely been *"did he train legs?"*
+rather than *"how hard did he train?"*. Compounding it, **136 of 274 sessions
+(half) contain unweighted sets volume cannot see at all.**
 
-Four things the fixture does not cover, in rough order of how much they matter:
+The owner has started logging RPE as a result. That is the fix; no estimation
+of bodyweight loads is planned, because `duration x RPE` does not care
+whether the load was external, and an estimate built from a bodyweight series
+that does not exist yet would be machinery producing a guess.
 
-1. **Volume load is not the primary load definition, and nothing says so.**
-   `session_load` prefers `duration x RPE` and falls back to volume. But
-   `Workout.perceived_exertion_1_10` is **never written** — the Hevy adapter
-   does not set it, and no other writer exists. Hevy carries RPE *per set*,
-   which the adapter stores on `workout_sets` and never aggregates. So for
-   every Hevy workout the primary branch is dead code and training load runs
-   entirely on the fallback. ACWR, and through it readiness, currently rests
-   on a definition the plan treats as the second choice.
-2. **A bodyweight or cardio session records as zero load, not as unknown.**
-   `_volume_kg` returns `0.0` when no set has both a weight and reps — which
-   is exactly what pull-ups, dips, planks and treadmill work look like in
-   Hevy. `session_load`'s docstring says an unquantifiable session "must not
-   silently count as zero load", and its `None` guard is defeated because the
-   adapter writes `0.0` rather than `None`. A real training day would land in
-   the chronic-load window as a rest day.
-3. **`dropset` and `failure` set types are untested.** The spec lists four set
-   types; the fixture has two. The adapter counts both toward volume and the
-   working-set count, which is probably right, but it is untested and unstated.
-4. **The fixture is thinner than a real payload.** It omits `routine_id`,
-   `updated_at`, `created_at`, per-exercise `notes` and `supersets_id`, and
-   per-set `custom_metric`; real sets send `distance_meters` and
-   `duration_seconds` as explicit nulls rather than omitting them. The adapter
-   uses `.get()` throughout so none of this breaks, but the fixture's `id`
-   ends `tc001` and is not a valid UUID, which is a fair summary of how
-   hand-written it is.
+### Changes
 
-Also noted: `/v1/workouts/count` exists and is unused. It is the cheap
-cross-check that a backfill imported everything, and the backfill should
-assert against it.
+- **Session RPE is aggregated and stored** — the mean of working sets that
+  carry one, warm-ups excluded. Not Foster's sRPE; close enough to drive the
+  same formula and what per-set logging supports.
+- **`_volume_kg` returns None, not 0.0**, when no working set has both a
+  weight and reps. Its own docstring said an unquantifiable session must not
+  count as zero load; the guard was defeated by the adapter never producing a
+  None. As it happens **0 of 274 sessions hit this** — a latent bug, not a
+  live one, and worth fixing before a bodyweight-only session abroad finds it.
+- **Blank descriptions store as null.**
+- **ACWR is withheld across a change of load definition.** The fortnight after
+  RPE logging starts, the acute window is RPE-based while the chronic window
+  is still volume-based, so the ratio measures the units changing rather than
+  the training. Simulated on the real training shape: ACWR 2.80 in week one
+  (a full 9-point readiness penalty), 1.75 in week two, back to normal by
+  week four. Two weeks of the score marked down for a spike that never
+  happened, and a brief obliged to explain it — R2 arriving through the back
+  door of a units change. `acwr` now takes a per-day set of load bases and
+  declines when the chronic window holds more than one, which is the pattern
+  it already used for a too-short window or a zero chronic load.
+- **The fixture is eight real scrubbed workouts**, chosen to carry between
+  them a warm-up, bodyweight sets, fractional weights, a near-midnight start,
+  and one session each from GMT and BST. The six fixture-based tests are
+  rewritten against real numbers, and the delete test now proves the other
+  seven survive — something a one-workout fixture could not test.
 
-**None of 1–4 has been changed.** They are findings, not fixes; 1 and 2 are
-decisions about what training load means, which is not a call to make silently
-inside an adapter.
+### Two process notes
 
-### Not verified, and still open
+The first version of `verify_hevy.py` **crashed on Windows** before printing
+anything useful: PowerShell writes cp1252, Hevy titles carry emoji, and the
+volume hand-check prints titles through `repr()`. Reproduced under
+`PYTHONIOENCODING=cp1252` and fixed by forcing UTF-8 on stdout. The report
+died on a decorative character rather than on anything it measured.
 
-Date attribution near midnight, the total-volume hand-check on a real workout,
-and the workout count and date range all need the real data. Note for when it
-arrives: a workout is attributed to the local date it **started**
-(`local_date(start_at)`), which is deliberate but written down nowhere — only
-sleep belongs to the day it ends. A session starting 23:50 and ending 00:40
-counts to the day it began.
+The raw report files were committed alongside the fixture by accident. They
+carry the **unscrubbed** payload — real ids, titles and notes — which defeats
+the point of scrubbing the fixture beside them. Removed and gitignored; they
+remain in the history of `caba164`, which is cosmetic in a private repo but
+worth knowing.
 
-### Next session
+### Next
 
-Get a real Hevy response, from a machine that can reach the API. Then the
-backfill, the count and date-range check, the hand-verified volume figure, and
-a scrubbed real payload committed as the fixture. Decide 1 and 2 above before
-readiness is trusted against real training data.
+Withings needs credentials before Phase 1's gate can move, and the Hevy
+import needs somewhere to run with both the key and network access. The
+readiness score has still never seen real data end to end — every number in
+it remains checked against fixtures and simulation.
 
 ---
 
