@@ -14,3 +14,8 @@ build/
 *.egg-info/
 .DS_Store
 data/exports/
+
+# Local verification output from scripts/verify_hevy.py. These carry the raw
+# API response — real workout ids, titles and notes — with none of the
+# scrubbing the committed fixture gets. Keep them out of the repo.
+hevy-report*.txt
