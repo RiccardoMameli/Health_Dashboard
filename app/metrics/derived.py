@@ -164,6 +164,56 @@ def chronic_load(daily_loads: Sequence[float], *, window: int = CHRONIC_WINDOW_D
     return float(sum(daily_loads[-window:])) / (window / 7)
 
 
+#: How trustworthy the load figures in a window are, given what produced them.
+#: Reported alongside ACWR rather than folded into it: a ratio derived from
+#: tonnage is a real number, it just answers a narrower question than one
+#: derived from perceived effort, and the reader is entitled to know which.
+LOAD_QUALITY_RPE = "rpe_based"
+LOAD_QUALITY_VOLUME = "volume_based"
+LOAD_QUALITY_MIXED = "mixed"
+
+#: The caveat text is written here, in tested code, rather than left to the
+#: model to phrase. The AI layer surfaces it verbatim; it does not compose it.
+LOAD_QUALITY_NOTES = {
+    LOAD_QUALITY_VOLUME: (
+        "Training load is volume-derived: no session in the 28-day window "
+        "recorded an RPE, so acute and chronic load reflect tonnage moved "
+        "rather than perceived effort. Read the acute:chronic ratio as "
+        "indicative, and note that it responds to exercise selection as well "
+        "as to training stress."
+    ),
+    LOAD_QUALITY_MIXED: (
+        "Training load changed definition inside the 28-day window, so the "
+        "acute:chronic ratio is withheld until the window carries a single "
+        "definition throughout."
+    ),
+}
+
+
+def load_quality(
+    daily_bases: Sequence[set[str]], *, window: int = CHRONIC_WINDOW_DAYS
+) -> str | None:
+    """Which definition produced the load in the chronic window.
+
+    None when no session in the window produced any load at all — there is
+    nothing to qualify, and reporting a quality for an empty window would
+    imply data that is not there.
+    """
+    seen: set[str] = set()
+    for bases in daily_bases[-window:]:
+        seen |= bases
+    if not seen:
+        return None
+    if len(seen) > 1:
+        return LOAD_QUALITY_MIXED
+    return LOAD_QUALITY_RPE if LOAD_BASIS_RPE in seen else LOAD_QUALITY_VOLUME
+
+
+def load_quality_note(quality: str | None) -> str | None:
+    """The reader-facing sentence for a quality label, or None when clean."""
+    return LOAD_QUALITY_NOTES.get(quality) if quality else None
+
+
 def acwr(
     daily_loads: Sequence[float],
     *,

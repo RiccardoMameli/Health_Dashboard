@@ -76,6 +76,7 @@ def metrics_for_day(day: Date, session: Session = Depends(db)) -> dict:
             "acute_load_7d": computed.acute_load_7d,
             "chronic_load_28d": computed.chronic_load_28d,
             "acwr": computed.acwr,
+            "load_quality": computed.load_quality,
             "days_since_rest": computed.days_since_rest,
         },
         "body": {

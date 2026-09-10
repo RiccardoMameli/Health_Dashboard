@@ -118,7 +118,12 @@ def today(session: Session = Depends(db)) -> dict:
             "baseline": computed.rhr_baseline.median if computed.rhr_baseline else None,
             "deviation_bpm": computed.rhr_deviation_bpm,
         },
-        "training": {"acwr": computed.acwr, "days_since_rest": computed.days_since_rest},
+        "training": {
+            "acwr": computed.acwr,
+            "load_quality": computed.load_quality,
+            "load_quality_note": computed.load_quality_note,
+            "days_since_rest": computed.days_since_rest,
+        },
         "brief": (
             {
                 "id": brief_row.id,
