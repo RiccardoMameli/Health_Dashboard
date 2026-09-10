@@ -234,12 +234,27 @@ def test_ui_route_serves_the_today_screen(client):
     response = client.get("/ui")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
-    body = response.text
-    assert "Readiness" in body
-    # The four designed mornings and the real one are rendered by the same
-    # code path, which is what stops the reference and the live view drifting.
-    for scenario in ("amber", "green", "red", "nowatch", "live"):
-        assert f'data-scenario="{scenario}"' in body
+    assert "Readiness" in response.text
+
+
+def test_ui_carries_no_example_data(client):
+    """The four hand-written mornings were the design's proof while there was
+    no real data. There is real data now, and an example on a screen meant to
+    show what is yours is worse than no screen at all."""
+    body = client.get("/ui").text
+    for scenario in ("amber", "green", "red", "nowatch"):
+        assert f'data-scenario="{scenario}"' not in body
+    assert "Preview a morning" not in body
+    assert "The language, in short" not in body      # the design-language explainer
+    assert "day 12 of 42" not in body                # an invented phase counter
+
+
+def test_ui_marks_the_unbuilt_cards_rather_than_hiding_them(client):
+    """Greyed and labelled, so the shape of what is coming stays visible while
+    it is unmistakably not a measurement."""
+    body = client.get("/ui").text
+    assert body.count("Coming soon") >= 3
+    assert 'class="card soon' in body
 
 
 def test_ui_route_is_not_cached(client):

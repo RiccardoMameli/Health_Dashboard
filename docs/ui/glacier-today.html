@@ -184,15 +184,20 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
 .st-none .status-glyph{background:var(--ink-3)}
 .st-none .status-name{color:var(--ink-3)}
 
-/* ── live-mode disclaimer: which tiles are real and which are drawn ── */
-.liveNote{
-  margin:0 0 18px; padding:10px 14px; max-width:none;
-  font-size:12.5px; line-height:1.5; color:var(--ink-2);
+/* ── not built yet: drawn, but plainly not yours ──────────────────────
+   Greyed and labelled rather than hidden, so the shape of what is coming
+   stays visible while it is unmistakably not a measurement. */
+.card.soon{ position:relative; }
+.card.soon > *:not(.soonTag){ opacity:.32; filter:grayscale(1); pointer-events:none; }
+[hidden]{ display:none !important; }
+
+.soonTag{
+  position:absolute; top:12px; right:12px; z-index:2;
+  font-family:var(--mono,monospace); font-size:10.5px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--ink-2);
   background:var(--surface-2); border:1px solid var(--hairline);
-  border-left:3px solid var(--warn); border-radius:8px;
+  border-radius:999px; padding:3px 9px;
 }
-.liveNote strong{ color:var(--ink); font-weight:600; }
-.liveNote code{ font-family:var(--mono,monospace); font-size:12px; }
 
 /* ── scenario switcher: the states the design has to survive ── */
 .scenarios{display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:0 2px 18px}
@@ -400,31 +405,13 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
   <header class="topbar">
     <div class="mark">
       <b>Glacier</b>
-      <span>Thursday 4 September · 06:34</span>
+      <span id="headerDate">—</span>
     </div>
-    <span class="pill phase"><i class="dot"></i><span id="phaseText">Baseline · day 12 of 42</span></span>
+    <span class="pill phase"><i class="dot"></i><span id="phaseText">—</span></span>
     <span class="pill"><i class="dot"></i><span id="completeness">87% complete</span></span>
+    <span class="pill" id="liveStatus" hidden></span>
     <button class="pill" id="theme" type="button" aria-label="Switch colour theme">Theme</button>
   </header>
-
-  <div class="scenarios" role="group" aria-label="Preview a different morning">
-    <span class="micro">Preview a morning</span>
-    <button class="scenario" type="button" data-scenario="amber" aria-pressed="true">Accumulating</button>
-    <button class="scenario" type="button" data-scenario="green" aria-pressed="false">Nothing unusual</button>
-    <button class="scenario" type="button" data-scenario="red" aria-pressed="false">Overreached</button>
-    <button class="scenario" type="button" data-scenario="nowatch" aria-pressed="false">Watch not worn</button>
-    <button class="scenario" type="button" data-scenario="live" aria-pressed="false" id="liveBtn">Live — my data</button>
-  </div>
-
-  <!-- Shown only in live mode. Half this screen is still hand-written design
-       markup, and on a view labelled "my data" that reads as measurement. -->
-  <p class="liveNote" id="liveNote" hidden>
-    <strong>Live:</strong> readiness, brief, sleep, resting HR, training and weight
-    are read from <code>/api/v1/today</code>.
-    <strong>Still design placeholders:</strong> the header date and phase pill, the
-    check-in card, supplements, and the source timestamps — those are hand-written
-    and not your data.
-  </p>
 
   <div class="bento">
 
@@ -473,7 +460,6 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
             <span class="track"><span class="fill" style="width:36%"></span></span>
           </div>
         </div>
-        <p class="defn">Tap any number to see its definition and inputs.</p>
       </div>
     </section>
 
@@ -529,9 +515,7 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
 
       <div class="feedback">
         <span class="micro" style="margin-right:4px">Was this useful</span>
-        <button class="fb" type="button" aria-pressed="false">Yes</button>
-        <button class="fb" type="button" aria-pressed="false">No</button>
-      </div>
+        <span class="soonTag" style="position:static">Coming soon</span>
     </section>
 
     <!-- ───────── four tiles ───────── -->
@@ -553,7 +537,7 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
       </div>
       <div class="foot">
         <span class="src s-samsung"><i></i>Samsung Health</span>
-        <span class="micro">7 nights</span>
+        <span class="micro">—</span>
       </div>
     </section>
 
@@ -627,8 +611,9 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     </section>
 
     <!-- ───────── check-in ───────── -->
-    <section class="card checkin span-4" aria-labelledby="ci">
-      <span class="micro" id="ci">Check-in · not yet submitted</span>
+    <section class="card soon checkin span-4" aria-labelledby="ci">
+      <span class="soonTag">Coming soon</span>
+      <span class="micro" id="ci">Check-in</span>
       <div class="sliders" aria-hidden="true">
         <div class="slider"><span class="lbl">Energy</span>
           <span class="pips"><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip"></i><i class="pip"></i></span></div>
@@ -637,7 +622,6 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
         <div class="slider"><span class="lbl">Stress</span>
           <span class="pips"><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip"></i></span></div>
       </div>
-      <p style="margin:0; font-size:12.5px; color:var(--ink-2)">Pre-filled with yesterday's answers. Seven sliders, one headline, thirteen tags — one screen, no scrolling.</p>
       <div>
         <span class="micro" style="display:block; margin-bottom:9px">Tags · 13 available</span>
         <div class="tags">
@@ -652,14 +636,13 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
       </div>
       <button class="cta" type="button">Check in · about 25 seconds</button>
       <div class="foot">
-        <span class="micro">Streak 11 days</span>
-        <span class="micro">30-day completion 87%</span>
       </div>
     </section>
 
     <!-- ───────── supplements ───────── -->
-    <section class="card span-4" aria-labelledby="sp">
-      <span class="micro" id="sp">Supplements · 93% over 7 days</span>
+    <section class="card soon span-4" aria-labelledby="sp">
+      <span class="soonTag">Coming soon</span>
+      <span class="micro" id="sp">Supplements</span>
       <div class="stack">
         <button class="supp" type="button" aria-pressed="true"><span class="box" aria-hidden="true">✓</span><span class="nm">Fish oil</span><span class="dose">4 softgels</span></button>
         <button class="supp" type="button" aria-pressed="true"><span class="box" aria-hidden="true">✓</span><span class="nm">Multivitamin</span><span class="dose">2 tablets</span></button>
@@ -669,11 +652,174 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
         <button class="supp" type="button" aria-pressed="false"><span class="box" aria-hidden="true">✓</span><span class="nm">Beta-alanine</span><span class="sched">Pre-workout</span></button>
         <button class="supp" type="button" aria-pressed="false"><span class="box" aria-hidden="true">✓</span><span class="nm">Magnesium complex</span><span class="sched">Bedtime</span></button>
       </div>
-      <p style="margin:12px 0 0; font-size:12.5px; color:var(--ink-2)">BCAA hidden — it is scheduled on workout days and none is logged yet.</p>
     </section>
 
     <!-- ───────── what the system cannot see ───────── -->
-    <section class="card span-4" aria-labelledby="dh">
+    <section class="card soon span-4" aria-labelledby="dh">
+      <span class="soonTag">Coming soon</span>
+      <span class="micro" id="dh">Not measured</span>
+      <div class="gaps">
+        <div class="gap">
+          <span class="micro">HRV</span>
+          <span class="em">—</span>
+          <span class="note">Not exposed by this device. Readiness runs on the fallback formula.</span>
+        </div>
+        <div class="gap">
+          <span class="micro">Protein g/kg</span>
+          <span class="em">—</span>
+          <span class="note">MyFitnessPal does not sync macros. Open item O2.</span>
+        </div>
+      </div>
+      <div class="sync">
+        <span class="row">Last-sync times are not wired up yet.</span>
+      </div>
+
+      <div class="feedback">
+        <span class="micro" style="margin-right:4px">Was this useful</span>
+        <button class="fb" type="button" aria-pressed="false">Yes</button>
+        <button class="fb" type="button" aria-pressed="false">No</button>
+      </div>
+    </section>
+
+    <!-- ───────── four tiles ───────── -->
+    <section class="card tile span-3" aria-labelledby="t1">
+      <div class="head">
+        <span class="micro" id="t1">Sleep</span>
+        <span class="delta down" id="sleepDelta">−88 min</span>
+      </div>
+      <div class="val" id="sleepVal">5<small>h</small> 42<small>m</small></div>
+      <div class="bars" id="sleepbars">
+        <div class="baseline" id="sleepBaseline" style="bottom:89.6%"><span id="sleepBaselineLabel">baseline 7h10m</span></div>
+        <div class="bar" style="height:89.2%" data-tip="Fri 29 Aug · 7h08m"></div>
+        <div class="bar" style="height:83.5%" data-tip="Sat 30 Aug · 6h41m"></div>
+        <div class="bar missing" style="height:100%" data-tip="Sun 31 Aug · no data — watch not worn"></div>
+        <div class="bar" style="height:82.5%" data-tip="Mon 1 Sep · 6h36m"></div>
+        <div class="bar" style="height:93.1%" data-tip="Tue 2 Sep · 7h27m"></div>
+        <div class="bar" style="height:77.5%" data-tip="Wed 3 Sep · 6h12m"></div>
+        <div class="bar last" style="height:71.3%" data-tip="Thu 4 Sep · 5h42m"></div>
+      </div>
+      <div class="foot">
+        <span class="src s-samsung"><i></i>Samsung Health</span>
+        <span class="micro">—</span>
+      </div>
+    </section>
+
+    <section class="card tile span-3" aria-labelledby="t2">
+      <div class="head">
+        <span class="micro" id="t2">Resting HR</span>
+        <span class="delta up" id="rhrDelta">+6 bpm</span>
+      </div>
+      <div class="val" id="rhrVal">58<small>bpm</small></div>
+      <svg class="spark" viewBox="0 0 220 70" role="img"
+           aria-label="Resting heart rate over 7 days, rising from 51 to 58 bpm against a 50 to 54 baseline band">
+        <rect id="rhrBand" x="0" y="32" width="220" height="13.3" fill="var(--accent-soft)"></rect>
+        <line id="rhrMedian" x1="0" y1="38.7" x2="220" y2="38.7" stroke="var(--hairline-2)" stroke-width="1" stroke-dasharray="3 4"></line>
+        <polyline id="rhrLine" points="10,42 43,35.3 76,38.7 109,32 142,35.3 175,25.3 208,18.7"
+                  fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>
+        <circle id="rhrDot" cx="208" cy="18.7" r="4.5" fill="var(--accent)" stroke="var(--bg)" stroke-width="2"></circle>
+        <text x="0" y="60" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9" id="rhrLo">51</text>
+        <text x="196" y="60" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9" id="rhrHi">58</text>
+      </svg>
+      <div class="foot">
+        <span class="src s-samsung"><i></i>Samsung Health</span>
+        <span class="micro" id="rhrFoot">Median 52</span>
+      </div>
+    </section>
+
+    <section class="card tile span-3" aria-labelledby="t3">
+      <div class="head">
+        <span class="micro" id="t3">Yesterday</span>
+        <span class="delta flat" id="trainDelta">RPE 8</span>
+      </div>
+      <div class="val" id="trainTitle" style="font-size:22px">Push A</div>
+      <div>
+        <span class="micro" id="trainVolume" style="letter-spacing:.1em">Volume 9,840 kg</span>
+        <div class="acwr">
+          <div class="rail"></div>
+          <div class="zone" style="left:20%; width:46.7%"></div>
+          <div class="flag" style="left:66.7%"><span>1.5</span></div>
+          <div class="knob" id="acwrKnob" style="left:51.3%"></div>
+        </div>
+        <div class="ends">
+          <span class="micro" id="acwrLabel">ACWR 1.27</span>
+          <span class="micro">Spike above 1.5</span>
+        </div>
+      </div>
+      <div class="foot">
+        <span class="src s-hevy"><i></i>Hevy</span>
+        <span class="micro" id="trainFoot">4 days since rest</span>
+      </div>
+    </section>
+
+    <section class="card tile span-3" aria-labelledby="t4">
+      <div class="head">
+        <span class="micro" id="t4">Weight trend</span>
+        <span class="delta ok" id="weightDelta">−0.24 kg/wk</span>
+      </div>
+      <div class="val" id="weightVal">84.2<small>kg</small></div>
+      <svg class="spark" viewBox="0 0 220 70" role="img"
+           aria-label="Smoothed weight over 30 days, falling from 85.0 to 84.2 kilograms">
+        <path id="weightArea" d="M10,18 L28.2,20.3 L46.4,22 L64.5,24.7 L82.7,27 L100.9,28.7 L119.1,32 L137.3,34.7 L155.5,37 L173.6,40 L191.8,42.7 L210,45.3 L210,58 L10,58 Z"
+              fill="var(--accent-soft)"></path>
+        <polyline id="weightLine" points="10,18 28.2,20.3 46.4,22 64.5,24.7 82.7,27 100.9,28.7 119.1,32 137.3,34.7 155.5,37 173.6,40 191.8,42.7 210,45.3"
+                  fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>
+        <circle id="weightDot" cx="210" cy="45.3" r="4.5" fill="var(--accent)" stroke="var(--bg)" stroke-width="2"></circle>
+        <text x="0" y="12" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9" id="weightHi">85.0</text>
+        <text x="186" y="66" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9" id="weightLo">84.2</text>
+      </svg>
+      <div class="foot">
+        <span class="src s-withings"><i></i>Withings</span>
+        <span class="micro">EWMA · 30 d</span>
+      </div>
+    </section>
+
+    <!-- ───────── check-in ───────── -->
+    <section class="card soon checkin span-4" aria-labelledby="ci">
+      <span class="soonTag">Coming soon</span>
+      <span class="micro" id="ci">Check-in</span>
+      <div class="sliders" aria-hidden="true">
+        <div class="slider"><span class="lbl">Energy</span>
+          <span class="pips"><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip"></i><i class="pip"></i></span></div>
+        <div class="slider"><span class="lbl">Sleep quality</span>
+          <span class="pips"><i class="pip on"></i><i class="pip on"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></div>
+        <div class="slider"><span class="lbl">Stress</span>
+          <span class="pips"><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip"></i></span></div>
+      </div>
+      <div>
+        <span class="micro" style="display:block; margin-bottom:9px">Tags · 13 available</span>
+        <div class="tags">
+          <button class="tag" type="button" aria-pressed="true">Late screen</button>
+          <button class="tag" type="button" aria-pressed="true">Work stress</button>
+          <button class="tag" type="button" aria-pressed="false">Alcohol</button>
+          <button class="tag" type="button" aria-pressed="false">Late meal</button>
+          <button class="tag" type="button" aria-pressed="false">No watch</button>
+          <button class="tag" type="button" aria-pressed="false">Travel</button>
+          <button class="tag" type="button" aria-pressed="false">Illness</button>
+        </div>
+      </div>
+      <button class="cta" type="button">Check in · about 25 seconds</button>
+      <div class="foot">
+      </div>
+    </section>
+
+    <!-- ───────── supplements ───────── -->
+    <section class="card soon span-4" aria-labelledby="sp">
+      <span class="soonTag">Coming soon</span>
+      <span class="micro" id="sp">Supplements</span>
+      <div class="stack">
+        <button class="supp" type="button" aria-pressed="true"><span class="box" aria-hidden="true">✓</span><span class="nm">Fish oil</span><span class="dose">4 softgels</span></button>
+        <button class="supp" type="button" aria-pressed="true"><span class="box" aria-hidden="true">✓</span><span class="nm">Multivitamin</span><span class="dose">2 tablets</span></button>
+        <button class="supp" type="button" aria-pressed="true"><span class="box" aria-hidden="true">✓</span><span class="nm">Vitamin D3</span><span class="dose">4,000 IU</span></button>
+        <button class="supp" type="button" aria-pressed="false"><span class="box" aria-hidden="true">✓</span><span class="nm">Vitamin C</span><span class="dose">1,000 mg</span></button>
+        <button class="supp" type="button" aria-pressed="false"><span class="box" aria-hidden="true">✓</span><span class="nm">Creatine</span><span class="dose">6 g</span></button>
+        <button class="supp" type="button" aria-pressed="false"><span class="box" aria-hidden="true">✓</span><span class="nm">Beta-alanine</span><span class="sched">Pre-workout</span></button>
+        <button class="supp" type="button" aria-pressed="false"><span class="box" aria-hidden="true">✓</span><span class="nm">Magnesium complex</span><span class="sched">Bedtime</span></button>
+      </div>
+    </section>
+
+    <!-- ───────── what the system cannot see ───────── -->
+    <section class="card soon span-4" aria-labelledby="dh">
+      <span class="soonTag">Coming soon</span>
       <span class="micro" id="dh">Not measured</span>
       <div class="gaps">
         <div class="gap">
@@ -697,55 +843,6 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
 
   </div>
 
-  <!-- ───────── design language ───────── -->
-  <section class="spec">
-    <h3>The language, in short</h3>
-    <p>Dark-first glass over a cool ground, Apple's spacing and restraint, an instrument-panel voice in the
-      monospaced micro-labels. Everything on this screen is drawn from the §9.1 brief contract in the plan —
-      real fields, real units, real gaps.</p>
-
-    <div class="specgrid">
-      <div>
-        <span class="micro">Palette</span>
-        <div class="swatches">
-          <div class="sw"><div class="chip" style="background:var(--bg)"></div><div class="nm">ground</div></div>
-          <div class="sw"><div class="chip" style="background:var(--surface-2)"></div><div class="nm">glass</div></div>
-          <div class="sw"><div class="chip" style="background:var(--accent)"></div><div class="nm">accent</div></div>
-          <div class="sw"><div class="chip" style="background:var(--good)"></div><div class="nm">green</div></div>
-          <div class="sw"><div class="chip" style="background:var(--warn)"></div><div class="nm">amber</div></div>
-          <div class="sw"><div class="chip" style="background:var(--crit)"></div><div class="nm">red</div></div>
-        </div>
-        <p style="font-size:12.5px; color:var(--ink-2); margin-top:12px">Glacier cyan is the interface: charts,
-          controls, anything you can touch. Green, amber and red are reserved for status and never used for
-          decoration — so an amber ring always means amber.</p>
-      </div>
-
-      <div>
-        <span class="micro">Type</span>
-        <div class="typerow">
-          <div><span>Sora — figures &amp; headlines</span>
-            <b class="num" style="font-family:var(--f-display); font-size:30px; font-weight:600">62 · 84.2 kg</b></div>
-          <div><span>Manrope — body</span>
-            <span style="font-size:15px">Sleep ran 88 minutes under baseline.</span></div>
-          <div><span>JetBrains Mono — labels &amp; evidence</span>
-            <span style="font-family:var(--f-mono); font-size:12px; letter-spacing:.02em">342 MIN · BASELINE 430 MIN</span></div>
-        </div>
-      </div>
-
-      <div>
-        <span class="micro">Four rules it enforces</span>
-        <ul class="rules">
-          <li><b>A gap is drawn as a gap.</b> The missing night is a dashed outline and the unavailable metrics
-            are em-dashes, never a zero and never a smoothed line.</li>
-          <li><b>The phase is always on screen.</b> The pill says baseline, so the brief states deviations and
-            claims no causes.</li>
-          <li><b>Status colour is not the accent.</b> Green, amber and red mean one thing each, and always carry
-            a word beside them.</li>
-          <li><b>No number is a black box.</b> Every figure opens its definition, its inputs and its source.</li>
-        </ul>
-      </div>
-    </div>
-  </section>
 </div>
 
 <div id="tip" role="status"></div>
@@ -800,35 +897,10 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     if (e.target.closest && e.target.closest('[data-tip]')) tip.style.opacity = '0';
   });
 
-  /* Readiness roll-up.
-
-     This animation writes #score directly, frame by frame, for 1.1s after
-     load. It has to yield the moment a scenario renders, or it overwrites
-     what the renderer just drew: clicking a no-score morning inside that
-     window left the arc empty, the label reading "no score", and a stale 62
-     sitting in the middle of the gauge — a fabricated readiness score
-     presented as a measurement, which is the one thing this screen must
-     never do. renderGauge sets the flag below; step() checks it every frame. */
-  window.__glacierScoreAnim = {cancelled: false};
-  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (!reduce){
-    var el = document.getElementById('score'), arc = document.getElementById('arc');
-    // Matches the amber scenario's score, which is what the markup ships with.
-    var target = 62, t0 = null;
-    arc.style.transition = 'stroke-dasharray 1.1s cubic-bezier(.22,.8,.3,1)';
-    arc.setAttribute('stroke-dasharray', '0 477.5');
-    requestAnimationFrame(function(){ arc.setAttribute('stroke-dasharray', '222.0 477.5'); });
-    function step(t){
-      if (window.__glacierScoreAnim.cancelled) return;   // a render has taken over
-      if (t0 === null) t0 = t;
-      var p = Math.min(1, (t - t0) / 1100);
-      var e = 1 - Math.pow(1 - p, 3);
-      el.textContent = Math.round(target * e);
-      if (p < 1) requestAnimationFrame(step);
-    }
-    el.textContent = '0';
-    requestAnimationFrame(step);
-  }
+  /* The intro roll-up animation was removed with the example mornings: it
+     counted #score up to a hard-coded 62, which is a fabricated readiness
+     score on a screen that renders live data the moment it loads. */
+  window.__glacierScoreAnim = {cancelled: true};
 })();
 </script>
 </body>
@@ -849,130 +921,36 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
   var ARC_LENGTH = 477.5;          // 2 * PI * r, r = 76
   var ARC_SWEEP  = 358.1;          // 270 degrees of it
   var SLEEP_SCALE_MIN = 480;       // full height of a sleep bar
-  var DAYS = ['Fri 29 Aug','Sat 30 Aug','Sun 31 Aug','Mon 1 Sep','Tue 2 Sep','Wed 3 Sep','Thu 4 Sep'];
-
-  var SCENARIOS = {
-    amber: {
-      completeness: '87% complete',
-      score: 62, status: 'amber', statusWord: 'Amber', glyph: '!',
-      lede: 'Confidence reduced — HRV is unavailable, so its weight was redistributed across sleep and resting heart rate.',
-      contributors: [
-        {name: 'Sleep debt, 14 days', impact: '−18', width: 72},
-        {name: 'Resting HR deviation', impact: '−9', width: 36}
-      ],
-      headline: 'Sleep ran 88 minutes under baseline and resting heart rate is 6 bpm above it.',
-      why: [
-        {obs: 'Last night was 342 minutes against a 30-day median of 430 minutes.', conf: 'High',
-         ev: '342 min · baseline 430 min · efficiency 81%'},
-        {obs: 'Resting heart rate has been above baseline for three consecutive mornings.', conf: 'Medium',
-         ev: '58 bpm · baseline 52 bpm · Δ +6'},
-        {obs: 'Training load is climbing, with four days since the last rest day.', conf: 'Medium',
-         ev: 'ACWR 1.27 · acute 2,140 · chronic 1,680'}
-      ],
-      doToday: [
-        {action: "Keep tonight's lights-out within 30 minutes of your usual time.",
-         rationale: 'Sleep midpoint variance is 74 minutes over the last fortnight.'},
-        {action: 'Log the check-in before 07:15.',
-         rationale: "Yesterday's entry arrived late and was flagged."}
-      ],
-      verdict: 'Train light',
-      verdictText: 'Sleep is short and resting HR is elevated. Keep the session submaximal, or move Pull B to tomorrow.',
-      caveat: 'Protein unavailable — MyFitnessPal does not sync macros. Nutrition is 45% complete for yesterday.',
-      sleep: {nights: [428,401,null,396,447,372,342], baseline: 430, delta: '−88 min', deltaClass: 'down'},
-      rhr: {series: [51,53,52,54,53,56,58], median: 52, delta: '+6 bpm', deltaClass: 'up'},
-      training: {title: 'Push A', rpe: 'RPE 8', volume: 'Volume 9,840 kg', acwr: 1.27, rest: '4 days since rest'},
-      weight: {series: [85.02,84.95,84.9,84.82,84.75,84.7,84.6,84.52,84.45,84.36,84.28,84.2],
-               delta: '−0.24 kg/wk', deltaClass: 'ok'}
-    },
-
-    green: {
-      completeness: '100% complete',
-      score: 94, status: 'green', statusWord: 'Green', glyph: '✓',
-      lede: 'Confidence reduced — HRV is unavailable, so its weight was redistributed across sleep and resting heart rate.',
-      contributors: [
-        {name: 'Sleep debt, 14 days', impact: '−4', width: 22},
-        {name: 'Sleep duration', impact: '−2', width: 11}
-      ],
-      headline: 'Nothing is unusual this morning. Sleep and resting heart rate sit at baseline.',
-      why: [
-        {obs: 'Last night was 448 minutes against a 30-day median of 430 minutes.', conf: 'High',
-         ev: '448 min · baseline 430 min · efficiency 92%'},
-        {obs: 'Resting heart rate is 51 bpm, one below the 30-day median.', conf: 'High',
-         ev: '51 bpm · baseline 52 bpm · Δ −1'}
-      ],
-      doToday: [
-        {action: 'Train as planned.',
-         rationale: 'Nothing in the data argues against the session you had scheduled.'}
-      ],
-      verdict: 'Train hard',
-      verdictText: 'Sleep, resting HR and load are all where they usually are. No reason to hold back.',
-      caveat: 'Protein unavailable — MyFitnessPal does not sync macros.',
-      sleep: {nights: [455,441,430,448,462,437,448], baseline: 430, delta: '+18 min', deltaClass: 'ok'},
-      rhr: {series: [52,51,53,52,51,52,51], median: 52, delta: '−1 bpm', deltaClass: 'ok'},
-      training: {title: 'Pull B', rpe: 'RPE 7', volume: 'Volume 8,420 kg', acwr: 1.05, rest: '1 day since rest'},
-      weight: {series: [84.6,84.58,84.52,84.48,84.44,84.4,84.34,84.3,84.25,84.2,84.15,84.1],
-               delta: '−0.21 kg/wk', deltaClass: 'ok'}
-    },
-
-    red: {
-      completeness: '100% complete',
-      score: 24, status: 'red', statusWord: 'Red', glyph: '!',
-      lede: 'Confidence reduced — HRV is unavailable, so its weight was redistributed across sleep and resting heart rate.',
-      contributors: [
-        {name: 'Resting HR deviation', impact: '−27', width: 90},
-        {name: 'Sleep debt, 14 days', impact: '−18', width: 60}
-      ],
-      headline: 'Resting heart rate has been 8 bpm above baseline for four consecutive mornings.',
-      why: [
-        {obs: 'Resting heart rate is 60 bpm against a 30-day median of 52 bpm.', conf: 'High',
-         ev: '60 bpm · baseline 52 bpm · Δ +8'},
-        {obs: 'Sleep debt has reached 700 minutes across 14 observed nights.', conf: 'High',
-         ev: 'debt 700 min · target 450 min/night · 14 nights observed'},
-        {obs: 'Six days have passed since the last rest day.', conf: 'High',
-         ev: 'ACWR 1.68 · acute 3,120 · chronic 1,860'}
-      ],
-      doToday: [
-        {action: 'Take a rest day.',
-         rationale: 'Six consecutive training days with resting HR 8 bpm above baseline.'},
-        {action: 'Log the check-in.',
-         rationale: 'Subjective scores are the only signal not already flagged this week.'}
-      ],
-      verdict: 'Rest',
-      verdictText: 'A sustained resting HR elevation of this size alongside accumulated sleep debt is worth mentioning to a GP if it continues past a few more days.',
-      caveat: 'Protein unavailable — MyFitnessPal does not sync macros.',
-      sleep: {nights: [402,377,395,368,352,341,358], baseline: 430, delta: '−72 min', deltaClass: 'down'},
-      rhr: {series: [54,55,57,58,59,60,60], median: 52, delta: '+8 bpm', deltaClass: 'up'},
-      training: {title: 'Push A', rpe: 'RPE 9', volume: 'Volume 11,200 kg', acwr: 1.68, rest: '6 days since rest'},
-      weight: {series: [84.4,84.42,84.45,84.47,84.5,84.5,84.52,84.55,84.55,84.58,84.6,84.6],
-               delta: '+0.12 kg/wk', deltaClass: 'flat'}
-    },
-
-    nowatch: {
-      completeness: '43% complete',
-      score: null, status: 'none', statusWord: 'No score', glyph: '—',
-      lede: 'Data completeness is 43%, below the 60% floor. No readiness score for this morning.',
-      contributors: null,
-      headline: 'The watch was not worn last night, so there is no sleep or resting heart rate to report.',
-      why: [
-        {obs: 'Yesterday you rated the day 6 out of 10 and tagged it late screen.', conf: 'Medium',
-         ev: 'overall 6 · energy 3 · stress 4 · tags: late_screen'}
-      ],
-      doToday: [
-        {action: 'Wear the watch tonight.',
-         rationale: 'This is the third unmeasured night in seven; the sleep baseline is close to being flagged as biased.'}
-      ],
-      verdict: 'No recommendation',
-      verdictText: 'Too little was measured overnight to say anything about readiness or training.',
-      caveat: 'Sleep and resting HR unavailable — the watch was not worn. Protein unavailable — MyFitnessPal does not sync macros.',
-      sleep: {nights: [428,401,null,396,447,372,null], baseline: 430, delta: 'no data', deltaClass: 'flat'},
-      rhr: {series: [51,53,52,54,53,56,null], median: 52, delta: 'no data', deltaClass: 'flat'},
-      training: {title: 'Rest day', rpe: '—', volume: 'No session logged', acwr: 1.27, rest: '0 days since rest'},
-      weight: {series: [85.02,84.95,84.9,84.82,84.75,84.7,84.6,84.52,84.45,84.36,84.28,84.2],
-               delta: '−0.24 kg/wk', deltaClass: 'ok'}
+  /* The last seven nights ending today, rather than a week frozen in August. */
+  var DAYS = (function(){
+    var out = [], d;
+    for (var i = 6; i >= 0; i--) {
+      d = new Date(); d.setDate(d.getDate() - i);
+      out.push(pad2(d.getDate()) + '-' + pad2(d.getMonth() + 1));
     }
-  };
+    return out;
+  })();
+
+  /* The four hand-written mornings that used to live here — accumulating,
+     nothing unusual, overreached, watch not worn — were the design's proof
+     while there was no real data. There is real data now, and example data on
+     a screen meant to show what is yours is worse than useless. They are in
+     git history if the states ever need drawing again.
+
+     `live` is populated by loadLive() and is the only scenario. */
+  var SCENARIOS = {};
 
   var STATUS_COLOUR = {green: 'var(--good)', amber: 'var(--warn)', red: 'var(--crit)', none: 'var(--ink-3)'};
+
+  function pad2(n){ return String(n).padStart(2, '0'); }
+
+  /* DD-MM-YYYY throughout. The API speaks ISO (YYYY-MM-DD) because that sorts
+     and parses unambiguously; the screen speaks the format its reader uses. */
+  function ukDate(iso){
+    if (!iso) return '—';
+    var parts = String(iso).slice(0, 10).split('-');
+    return parts.length === 3 ? parts[2] + '-' + parts[1] + '-' + parts[0] : String(iso);
+  }
 
   function $(id){ return document.getElementById(id); }
   function set(id, text){ var el = $(id); if (el) el.textContent = text; }
@@ -1246,6 +1224,12 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     });
   }
 
+  function renderHeader(d){
+    set('headerDate', ukDate(d.date));
+    var phase = d.phase ? String(d.phase) : '';
+    set('phaseText', phase ? phase.charAt(0).toUpperCase() + phase.slice(1) : '—');
+  }
+
   function liveScenario(d){
     var readiness = d.readiness_detail || null;
     var status = readiness && readiness.status ? readiness.status : 'none';
@@ -1295,7 +1279,7 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
            most recent session whenever it happened. An undated title on a
            screen headed with this morning's date reads as this morning's
            session. */
-        title: w ? ((w.title || 'Untitled session') + ' · ' + w.date) : 'No session logged',
+        title: w ? ((w.title || 'Untitled session') + ' · ' + ukDate(w.date)) : 'No session logged',
         rpe: '—',
         volume: w && w.volume_kg !== null && w.volume_kg !== undefined
           ? Number(w.volume_kg).toLocaleString() + ' kg'
@@ -1309,11 +1293,17 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     };
   }
 
+  function status(text){
+    var el = $('liveStatus');
+    if (!el) return;
+    el.hidden = !text;
+    el.textContent = text || '';
+  }
+
   function loadLive(){
     var t = token();
     if (!t) return;
-    var btn = $('liveBtn');
-    if (btn) btn.textContent = 'Live — loading…';
+    status('Loading…');
     fetch('/api/v1/today', {headers: {Authorization: 'Bearer ' + t}})
       .then(function(r){
         if (r.status === 401) { forgetToken(); throw new Error('Token rejected'); }
@@ -1321,20 +1311,19 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
         return r.json();
       })
       .then(function(d){
+        renderHeader(d);
         SCENARIOS.live = liveScenario(d);
-        if (btn) btn.textContent = 'Live — my data';
+        status(null);
         render('live');
       })
       .catch(function(err){
-        if (btn) btn.textContent = 'Live — ' + err.message;
+        status(err.message + ' — reload to retry');
       });
   }
 
   function render(key){
     var s = SCENARIOS[key];
     if (!s) return;
-    var note = $('liveNote');
-    if (note) note.hidden = key !== 'live';
     set('completeness', s.completeness);
     renderGauge(s);
     renderContributors(s);
@@ -1348,14 +1337,6 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     });
   }
 
-  Array.prototype.forEach.call(document.querySelectorAll('.scenario'), function(b){
-    b.addEventListener('click', function(){
-      var key = b.getAttribute('data-scenario');
-      if (key === 'live') { loadLive(); return; }   // always refetch; never show a stale morning
-      render(key);
-    });
-  });
-
-  render('amber');   // render rather than trust the markup, so the two cannot drift
+  loadLive();   // the only view there is
 })();
 </script>

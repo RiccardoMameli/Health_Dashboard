@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import db, require_token
+from app.config import get_settings
 from app.models import BodyMeasurement, Checkin, Workout
 from app.schemas.common import BodyMeasurementOut, WorkoutOut
 from app.services import brief as brief_service
@@ -81,7 +82,10 @@ def today(session: Session = Depends(db)) -> dict:
 
     return {
         "date": day.isoformat(),
-        "phase": "baseline",  # locked until 6 weeks of data exist (D8)
+        # From config, not a literal: BRIEF_PHASE is the single source of truth
+        # and promotion out of baseline is a deliberate act (D8), so a hard-coded
+        # "baseline" here would keep saying so after the config had moved on.
+        "phase": get_settings().brief_phase,
         "checkin_submitted": session.get(Checkin, day) is not None,
         "last_workout": (
             {
