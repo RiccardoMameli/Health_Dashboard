@@ -81,6 +81,19 @@ targets that trend toward restriction.
 - Weights, thresholds and windows live in `app/config.py` or as named module
   constants with a comment saying why that number. No bare magic numbers.
 
+## Delivery
+
+**Merge to `main` as soon as CI is green** (decided 10 Sep 2026). Work is
+pushed to the feature branch, CI is verified there, and then merged straight
+to `main` unless the owner says otherwise. He stays on `main` permanently and
+only ever pulls.
+
+This is not a style preference. Three separate times, work sat on a feature
+branch while he was on `main`, and each time the symptom was a confusing
+failure — a missing script, then a 404 — that cost a round trip to diagnose.
+A single-user project where the owner is the only reviewer gains nothing from
+a long-lived branch and loses a working session to it.
+
 ## Phase gates
 
 Do not start a phase until the previous one's acceptance test passes. The gates
