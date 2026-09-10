@@ -74,11 +74,16 @@ behaviour starts, not when the code ships.
 
 ## D. Needs building, not blocked by anything
 
+**Direction set 10 Sep 2026:** get to a working MVP and iterate on the UI
+before adding integrations that cannot pay off until the sleep stream exists.
+The Today screen came first for that reason.
+
 | # | Item | Phase | Notes |
 |---|---|---|---|
-| D1 | **Check-in form** | 1 | Listed in §14 Phase 1 and never built — the Phase 0/1 session was backend-only. The API exists; there is no way to actually use it daily. This is what C1 is waiting on |
-| D2 | Minimal Today screen | 1 | Also §14 Phase 1, also not built. `docs/ui/glacier-today.html` is a static reference, not a running screen |
-| D3 | Eval set for the brief (§9.4) | 2 | ~15 hand-picked days including a no-watch day and a missing-macros day |
+| D1 | **Check-in form** | 1 | Listed in §14 Phase 1 and never built — the Phase 0/1 session was backend-only. The API exists; there is no way to actually use it daily. This is what C1 is waiting on. **Deferred 10 Sep 2026** in favour of getting an MVP UI up first: the form matters less until there is a screen to put it on and sleep data to give it context |
+| D2 | ~~Minimal Today screen~~ | 1 | **Done 10 Sep 2026.** `GET /ui` serves the Glacier reference from the backend with a "Live — my data" view reading `/api/v1/today`. Half the screen is still hand-written placeholder markup — the check-in card, supplements, source timestamps and header date — and says so in live mode |
+| D3 | Wire the remaining live tiles | 1–2 | Check-in state, supplement adherence and source timestamps are still design markup. Needs D1 and a data-health call. Sleep and RHR sparklines need a short series on `/today`, which is pointless until there is sleep data (A2/A3) |
+| D4 | Eval set for the brief (§9.4) | 2 | ~15 hand-picked days including a no-watch day and a missing-macros day |
 
 ---
 
