@@ -316,6 +316,14 @@ def scrub(workouts: list[dict]) -> tuple[list[dict], dict[str, str]]:
 
 
 def main() -> int:
+    # Windows consoles default to cp1252, and Hevy titles carry emoji often
+    # enough that printing one would crash the run rather than report it.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):  # already wrapped, or not a TextIO
+            pass
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--pages", type=int, default=None, help="stop after N pages")
     parser.add_argument("--write-fixture", action="store_true")
