@@ -24,13 +24,23 @@ that real history too (`scripts/verify_metrics.py`). Withings and the
 readiness score have still only ever seen fixtures.
 
 `GET /ui` serves the Today screen against live data, with the per-muscle
-recovery figure (plan §14.1 F1). 163 tests passing.
+recovery figure (plan §14.1 F1).
+
+The Samsung Health export parser (`app/adapters/samsung_export.py`,
+`scripts/import_samsung_export.py`) reads sleep, steps, weight and heart rate
+out of the export zip. It **proves whether the timestamps are local or UTC
+from the export's own bedtimes and refuses to write anything if the data
+cannot settle it** — the wrong reading is invisible in winter and moves every
+summer night onto the wrong day. It has run against an export shaped like the
+real one, not the real 744 MB export. 184 tests passing.
 
 **Readiness needs 5 of 7 fields to clear the 60% floor, and Samsung Health
 supplies 4 of them.** Withings, MyFitnessPal and the check-in supply one each,
 so without the sleep stream the ceiling is 43% and the score reads
 `insufficient_data` no matter what else is connected. This is the constraint
-that decides what is worth building next; it is not a code problem.
+that decides what is worth building next; it is not a code problem. The export
+parser is the route to those four fields for *history*; the nightly feed still
+needs the Phase 3 companion app (outstanding A3).
 
 Phase 2's *gate* is not met and cannot be met by writing code: it needs seven
 consecutive days of an accurate brief against real data. Same for Phase 1's

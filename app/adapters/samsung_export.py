@@ -1,0 +1,420 @@
+"""Parse a Samsung Health export (plan §3.5, D9).
+
+There is no Samsung cloud API (§3.3), so deep history arrives as a one-off
+export: a zip of CSVs, one per data type, written by the phone. This module
+turns those into records the canonical schema can hold. It is not an `Adapter`
+— there is nothing to poll — it reads a file that a human produced.
+
+Three things about the format matter more than the rest, all of them found by
+inspecting a real 744 MB export rather than by assuming:
+
+1. **The real header is on line 2.** Line 1 carries the package name and a
+   version. Reading line 1 as the header produces a parser that runs happily
+   and mislabels every column.
+
+2. **Timestamps are wall-clock, with the offset in a separate column.** A row
+   reads `2022-07-22 23:10:00.000` alongside `UTC+0100`. Which of those two is
+   the instant depends on whether Samsung wrote local time or UTC, and the
+   difference is invisible for the half of the year the offset is zero. That
+   question is not assumed here — `detect_timestamp_basis` answers it from the
+   data, and the importer refuses to run if the answer is not clear.
+
+3. **A zero can mean "not measured".** `efficiency` is `0.0` on sessions that
+   have no efficiency, while `original_efficiency` carries the real figure on
+   the ones that do. Storing the zero would put a fabricated 0% into a column
+   the metrics engine reads as measured — the "a null is a null" invariant
+   failing in the one direction that is hard to see.
+"""
+
+from __future__ import annotations
+
+import csv
+import re
+import zipfile
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from statistics import mean
+
+#: Samsung exports have appeared as UTF-8, UTF-8 with a BOM, and UTF-16.
+ENCODINGS = ("utf-8-sig", "utf-8", "utf-16")
+
+#: Line 1 is metadata; the header is below it. Scanned rather than assumed
+#: fixed, because the depth has moved between app versions.
+MAX_HEADER_SCAN = 4
+
+OFFSET_RE = re.compile(r"^UTC([+-])(\d{2})(\d{2})$")
+
+#: The metadata line reads like `com.samsung.shealth.sleep,7006011,11`: a
+#: package name and two integers. Recognising it directly matters because the
+#: fallback rule — the line whose width the data rows agree with — cannot tell
+#: it apart from a header that happens to have three columns, and the
+#: heart-rate file is exactly that shape.
+METADATA_RE = re.compile(r"^[a-z][\w.]*\.[\w]+$", re.I)
+
+#: Records at the epoch are sentinels, not observations. The real export has
+#: one in the HRV file. Stored, it would sit in every baseline window forever.
+EPOCH_CUTOFF = datetime(1990, 1, 1, tzinfo=UTC)
+
+BASIS_LOCAL = "local"
+BASIS_UTC = "utc"
+
+
+def decode(raw: bytes) -> str:
+    for encoding in ENCODINGS:
+        try:
+            text = raw.decode(encoding)
+        except (UnicodeDecodeError, UnicodeError):
+            continue
+        if "\x00" not in text:
+            return text
+    return raw.decode("utf-8", errors="replace")
+
+
+def read_rows(raw: bytes) -> list[dict[str, str]]:
+    """Rows as dicts, with the header found rather than assumed."""
+    lines = decode(raw).splitlines()
+    if not lines:
+        return []
+
+    # The header is the candidate line whose field count the data rows agree
+    # with. "Most fields wins" was the first rule here and it is wrong: the
+    # metadata line has three fields, so it beats any header with fewer, and a
+    # short file would parse into nonsense that still looked like a table.
+    best_index, best_columns, best_agreement = 0, [], -1
+    for index, line in enumerate(lines[:MAX_HEADER_SCAN]):
+        fields = [f.strip() for f in next(csv.reader([line]), [])]
+        width = len(fields)
+        if not width:
+            continue
+        if (
+            width <= 3
+            and METADATA_RE.match(fields[0] or "")
+            and all(f.isdigit() for f in fields[1:] if f)
+        ):
+            continue                       # the package-and-version line
+        agreement = sum(
+            1 for row in csv.reader(lines[index + 1 : index + 40]) if len(row) == width
+        )
+        # Strictly greater, so the earliest qualifying line wins a tie. The
+        # data rows are themselves candidates and agree with each other just as
+        # well as the header does; preferring the later one picked a data row
+        # and lost the entire file.
+        if agreement > best_agreement:
+            best_index, best_columns, best_agreement = index, fields, agreement
+    best_columns = [c for c in best_columns if c]
+    if not best_columns:
+        return []
+    return [
+        dict(zip(best_columns, row, strict=False))
+        for row in csv.reader(lines[best_index + 1 :])
+        if any(f.strip() for f in row)
+    ]
+
+
+def parse_offset(value: str | None) -> int | None:
+    """"UTC+0100" to minutes east of UTC."""
+    if not value:
+        return None
+    match = OFFSET_RE.match(value.strip())
+    if not match:
+        return None
+    sign, hours, minutes = match.groups()
+    total = int(hours) * 60 + int(minutes)
+    return -total if sign == "-" else total
+
+
+def parse_naive(value: str | None) -> datetime | None:
+    if not value or not value.strip():
+        return None
+    try:
+        return datetime.strptime(value.strip()[:19], "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None
+
+
+def to_utc(naive: datetime | None, offset_min: int | None, basis: str) -> datetime | None:
+    """Resolve a wall-clock reading and its offset into a real instant."""
+    if naive is None:
+        return None
+    if basis == BASIS_UTC or offset_min is None:
+        return naive.replace(tzinfo=UTC)
+    return (naive - timedelta(minutes=offset_min)).replace(tzinfo=UTC)
+
+
+def number(value: str | None, *, zero_is_null: bool = False) -> float | None:
+    """A blank is None. With zero_is_null, so is an exact zero.
+
+    `efficiency` is 0.0 on sessions that never measured it; `sleep_duration` is
+    blank on the same rows. Only the first of those is dangerous, because only
+    the first parses.
+    """
+    if value is None or not str(value).strip():
+        return None
+    try:
+        parsed = float(value)
+    except ValueError:
+        return None
+    if zero_is_null and parsed == 0:
+        return None
+    return parsed
+
+
+# ── the timezone question ───────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class BasisVerdict:
+    """Which reading of the timestamps is coherent, and the evidence for it."""
+
+    basis: str | None
+    shift_if_local_hours: float
+    shift_if_utc_hours: float
+    standard_count: int
+    daylight_count: int
+    note: str
+
+    @property
+    def confident(self) -> bool:
+        return self.basis is not None
+
+
+def _circular_mean_hour(hours: list[float]) -> float:
+    """Mean of clock hours that straddle midnight.
+
+    A bedtime set of 23:30 and 00:30 averages to midnight, not to noon, so
+    early-morning hours are treated as late on the previous day before
+    averaging — the same trick sleep_midpoint_minutes uses.
+    """
+    return mean(h + 24 if h < 12 else h for h in hours) % 24
+
+
+def detect_timestamp_basis(
+    samples: list[tuple[datetime, int | None]],
+    *,
+    min_per_group: int = 20,
+    decisive_hours: float = 0.5,
+) -> BasisVerdict:
+    """Decide whether Samsung's timestamps are local wall-clock or UTC.
+
+    The test uses the seasons against each other. Under the correct reading,
+    bedtimes look the same in winter and summer — people go to bed at a time,
+    not at an offset. Under the wrong one, every summer record shifts by
+    exactly the daylight-saving hour and the two groups separate.
+
+    So: split the samples by whether their offset is the standard one or the
+    daylight one, compute the mean bedtime of each group under both readings,
+    and take the reading whose seasonal gap is the smaller. If neither gap is
+    clearly smaller, or either group is too thin, this returns no verdict —
+    guessing here is how sleep silently lands on the wrong day for half of
+    every year.
+    """
+    offsets = [o for _, o in samples if o is not None]
+    if not offsets:
+        return BasisVerdict(None, 0.0, 0.0, 0, 0, "no usable offsets in the sample")
+
+    standard_offset = min(offsets)
+    daylight_offset = max(offsets)
+    if standard_offset == daylight_offset:
+        return BasisVerdict(
+            None, 0.0, 0.0, len(offsets), 0,
+            "every sample shares one offset, so the seasons cannot be compared",
+        )
+
+    def gap(basis: str) -> tuple[float, int, int]:
+        groups: dict[int, list[float]] = {standard_offset: [], daylight_offset: []}
+        for naive, offset in samples:
+            if offset not in groups:
+                continue
+            instant = to_utc(naive, offset, basis)
+            local = instant + timedelta(minutes=offset)
+            groups[offset].append(local.hour + local.minute / 60)
+        standard, daylight = groups[standard_offset], groups[daylight_offset]
+        if len(standard) < min_per_group or len(daylight) < min_per_group:
+            return float("nan"), len(standard), len(daylight)
+        # Circular: 23:00 and 00:00 are an hour apart, not twenty-three.
+        raw_difference = _circular_mean_hour(daylight) - _circular_mean_hour(standard)
+        difference = (raw_difference + 12) % 24 - 12
+        return abs(difference), len(standard), len(daylight)
+
+    local_gap, standard_n, daylight_n = gap(BASIS_LOCAL)
+    utc_gap, _, _ = gap(BASIS_UTC)
+
+    if local_gap != local_gap or utc_gap != utc_gap:  # NaN: too few in a group
+        return BasisVerdict(
+            None, local_gap, utc_gap, standard_n, daylight_n,
+            f"need {min_per_group} samples either side of a daylight-saving "
+            f"change; have {standard_n} and {daylight_n}",
+        )
+
+    if abs(local_gap - utc_gap) < decisive_hours:
+        return BasisVerdict(
+            None, local_gap, utc_gap, standard_n, daylight_n,
+            "the two readings fit the data equally well, so neither is proven",
+        )
+
+    basis = BASIS_LOCAL if local_gap < utc_gap else BASIS_UTC
+    return BasisVerdict(
+        basis, local_gap, utc_gap, standard_n, daylight_n,
+        f"reading them as {basis} leaves a {min(local_gap, utc_gap):.2f}h seasonal "
+        f"gap against {max(local_gap, utc_gap):.2f}h for the alternative",
+    )
+
+
+# ── files ───────────────────────────────────────────────────────────────────
+
+
+def load_export(path: Path) -> dict[str, bytes]:
+    """Every CSV in the export, keyed by filename. Zip or extracted folder."""
+    if path.is_file() and path.suffix.lower() == ".zip":
+        with zipfile.ZipFile(path) as archive:
+            return {
+                Path(info.filename).name: archive.read(info)
+                for info in archive.infolist()
+                if not info.is_dir() and info.filename.lower().endswith(".csv")
+            }
+    if path.is_dir():
+        return {f.name: f.read_bytes() for f in path.rglob("*.csv")}
+    raise FileNotFoundError(f"not a zip or a folder: {path}")
+
+
+def find(files: dict[str, bytes], stem: str) -> bytes | None:
+    """The export suffixes every filename with a timestamp."""
+    for name, raw in files.items():
+        if name.startswith(stem + "."):
+            return raw
+    return None
+
+
+# ── records ─────────────────────────────────────────────────────────────────
+
+SLEEP_FILE = "com.samsung.shealth.sleep"
+HEART_FILE = "com.samsung.shealth.tracker.heart_rate"
+STEPS_FILE = "com.samsung.shealth.tracker.pedometer_day_summary"
+WEIGHT_FILE = "com.samsung.health.weight"
+
+#: Samsung's stage codes, from the real export's sleep_stage file.
+STAGE_AWAKE, STAGE_LIGHT, STAGE_DEEP, STAGE_REM = "40001", "40002", "40003", "40004"
+
+
+@dataclass(frozen=True)
+class SleepRecord:
+    source_record_id: str
+    start_at: datetime
+    end_at: datetime
+    duration_min: int
+    efficiency_pct: float | None
+    deep_min: int | None
+    rem_min: int | None
+    light_min: int | None
+    score: float | None
+
+
+def parse_sleep(raw: bytes, basis: str) -> list[SleepRecord]:
+    """Sleep sessions.
+
+    Duration is computed from the two timestamps rather than read: the records
+    before 2024 carry no `sleep_duration` at all, and a session that has a start
+    and an end has a duration whether or not the phone wrote one down.
+
+    Efficiency comes from `original_efficiency`, falling back to `efficiency`
+    with zero treated as absent — see the module docstring.
+    """
+    out: list[SleepRecord] = []
+    for row in read_rows(raw):
+        start = to_utc(
+            parse_naive(row.get("com.samsung.health.sleep.start_time")),
+            parse_offset(row.get("com.samsung.health.sleep.time_offset")),
+            basis,
+        )
+        end = to_utc(
+            parse_naive(row.get("com.samsung.health.sleep.end_time")),
+            parse_offset(row.get("com.samsung.health.sleep.time_offset")),
+            basis,
+        )
+        identifier = (row.get("com.samsung.health.sleep.datauuid") or "").strip()
+        if start is None or end is None or end <= start or not identifier:
+            continue
+        if start < EPOCH_CUTOFF:
+            continue
+        efficiency = number(row.get("original_efficiency"))
+        if efficiency is None:
+            efficiency = number(row.get("efficiency"), zero_is_null=True)
+        out.append(
+            SleepRecord(
+                source_record_id=identifier,
+                start_at=start,
+                end_at=end,
+                duration_min=int((end - start).total_seconds() // 60),
+                efficiency_pct=efficiency,
+                deep_min=_as_int(row.get("total_deep_duration")),
+                rem_min=_as_int(row.get("total_rem_duration")),
+                light_min=_as_int(row.get("total_light_duration")),
+                score=number(row.get("sleep_score"), zero_is_null=True),
+            )
+        )
+    return out
+
+
+def _as_int(value: str | None) -> int | None:
+    parsed = number(value)
+    return None if parsed is None else int(parsed)
+
+
+def parse_heart_samples(raw: bytes, basis: str) -> list[tuple[datetime, float]]:
+    """Every heart-rate reading as (instant, bpm). Resting HR is derived from
+    these by `app.metrics.derived.resting_hr_from_samples`; the export has no
+    resting-HR field of its own."""
+    out: list[tuple[datetime, float]] = []
+    for row in read_rows(raw):
+        instant = to_utc(
+            parse_naive(row.get("com.samsung.health.heart_rate.start_time")),
+            parse_offset(row.get("com.samsung.health.heart_rate.time_offset")),
+            basis,
+        )
+        bpm = number(row.get("com.samsung.health.heart_rate.heart_rate"), zero_is_null=True)
+        if instant is None or bpm is None or instant < EPOCH_CUTOFF:
+            continue
+        out.append((instant, bpm))
+    return out
+
+
+def parse_steps(raw: bytes) -> dict:
+    """Daily step totals, keyed by local date.
+
+    `day_time` is local midnight — that is what settled the basis question in
+    the first place — so the date is read straight off it and no offset applies.
+    """
+    out: dict = {}
+    for row in read_rows(raw):
+        day = parse_naive(row.get("day_time"))
+        steps = number(row.get("step_count"))
+        if day is None or steps is None or day < EPOCH_CUTOFF.replace(tzinfo=None):
+            continue
+        active_ms = number(row.get("active_time"))
+        out[day.date()] = {
+            "steps": int(steps),
+            "distance_m": number(row.get("distance")),
+            "active_energy_kcal": number(row.get("calorie")),
+            "active_minutes": None if active_ms is None else int(active_ms / 60000),
+        }
+    return out
+
+
+def parse_weight(raw: bytes, basis: str) -> dict:
+    """Weight and body composition, latest reading per local date."""
+    out: dict = {}
+    for row in read_rows(raw):
+        offset = parse_offset(row.get("time_offset"))
+        instant = to_utc(parse_naive(row.get("start_time")), offset, basis)
+        weight = number(row.get("weight"), zero_is_null=True)
+        if instant is None or weight is None or instant < EPOCH_CUTOFF:
+            continue
+        local = instant + timedelta(minutes=offset or 0)
+        out[local.date()] = {
+            "weight_kg": weight,
+            "body_fat_pct": number(row.get("body_fat"), zero_is_null=True),
+            "muscle_mass_kg": number(row.get("muscle_mass"), zero_is_null=True),
+            "water_pct": number(row.get("total_body_water"), zero_is_null=True),
+        }
+    return out
