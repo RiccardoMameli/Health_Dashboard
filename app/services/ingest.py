@@ -22,14 +22,26 @@ def sync_run(session: Session, source: str) -> Iterator[SyncRun]:
     """Bookkeep one adapter invocation. Failures are recorded, not swallowed."""
     run = SyncRun(source=source, started_at=utcnow(), status="running", records_ingested=0)
     session.add(run)
-    session.flush()
+    # Committed before any work, not merely flushed, so the row survives the
+    # rollback below and a process killed mid-sync leaves a `running` row
+    # rather than no evidence that it ever started.
+    session.commit()
+    run_id = run.id
     try:
         yield run
     except Exception as exc:
-        run.status = "failed"
-        run.error_message = f"{type(exc).__name__}: {exc}"[:2000]
-        run.finished_at = utcnow()
-        session.commit()
+        # Roll back first. A failed flush leaves the session refusing every
+        # further statement, so writing the failure onto it raised
+        # PendingRollbackError and the failed run went unrecorded — the exact
+        # silent-ingestion-failure this bookkeeping exists to prevent. The
+        # original error was then buried under the second one.
+        session.rollback()
+        failed = session.get(SyncRun, run_id)
+        if failed is not None:
+            failed.status = "failed"
+            failed.error_message = f"{type(exc).__name__}: {exc}"[:2000]
+            failed.finished_at = utcnow()
+            session.commit()
         raise
     else:
         run.status = "success"

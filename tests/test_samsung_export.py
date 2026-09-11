@@ -5,7 +5,7 @@ is local or UTC, and whether a zero is a measurement. Both are invisible when
 wrong — the first for half of every year, the second always.
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
@@ -416,3 +416,22 @@ def test_an_earlier_summer_bedtime_does_not_forge_a_utc_verdict():
     verdict = detect_timestamp_basis(samples)
     assert verdict.window == "clock change"
     assert verdict.basis == BASIS_LOCAL
+
+
+def test_a_day_counted_by_two_devices_keeps_the_larger_count():
+    """The pedometer file has one row per device. Taking the last row reported
+    a pocketed phone's count for days the watch saw three times as many, and
+    summing would count one walk twice."""
+    raw = csv_bytes(
+        "com.samsung.shealth.tracker.pedometer_day_summary",
+        ["day_time", "step_count", "distance", "calorie", "active_time"],
+        [
+            ["2021-04-15 00:00:00.000", "11402", "8900.0", "410.0", "3600000"],
+            ["2021-04-15 00:00:00.000", "2964", "2100.0", "98.0", "900000"],
+        ],
+    )
+    parsed = parse_steps(raw)
+    assert parsed[date(2021, 4, 15)]["steps"] == 11402
+    # The rest of the figures come from that same row, not mixed across rows.
+    assert parsed[date(2021, 4, 15)]["distance_m"] == 8900.0
+    assert parsed[date(2021, 4, 15)]["active_minutes"] == 60

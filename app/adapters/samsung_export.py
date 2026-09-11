@@ -529,23 +529,35 @@ def parse_heart_samples(raw: bytes, basis: str) -> list[tuple[datetime, float]]:
 def parse_steps(raw: bytes) -> dict:
     """Daily step totals, keyed by local date.
 
-    `day_time` is local midnight — that is what settled the basis question in
-    the first place — so the date is read straight off it and no offset applies.
+    `day_time` is local midnight, so the date is read straight off it and no
+    offset applies. This is the file that shows the export mixes conventions:
+    the sleep file next to it stores UTC.
+
+    **A day has one row per device that counted it** — a phone in a pocket, a
+    watch on a wrist, sometimes both. Taking whichever came last in the file
+    is arbitrary and can report a pocket phone's 2,964 steps for a day the
+    watch saw 11,000. Summing is worse: it counts one walk once per device.
+    So the largest count for a day wins, being the device that saw most of it,
+    and the rest of that row's figures come from the same row rather than
+    being mixed across devices.
     """
-    out: dict = {}
+    best: dict = {}
     for row in read_rows(raw):
         day = parse_naive(row.get("day_time"))
         steps = number(row.get("step_count"))
         if day is None or steps is None or day < EPOCH_CUTOFF.replace(tzinfo=None):
             continue
+        date = day.date()
+        if date in best and best[date]["steps"] >= int(steps):
+            continue
         active_ms = number(row.get("active_time"))
-        out[day.date()] = {
+        best[date] = {
             "steps": int(steps),
             "distance_m": number(row.get("distance")),
             "active_energy_kcal": number(row.get("calorie")),
             "active_minutes": None if active_ms is None else int(active_ms / 60000),
         }
-    return out
+    return best
 
 
 def parse_weight(raw: bytes, basis: str) -> dict:
