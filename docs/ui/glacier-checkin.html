@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Check-in</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ─────────────────────────────────────────────────────────────
+   GLACIER — check-in.  Same tokens as the Today screen; this is
+   the same product, not a form bolted to the side of it.
+
+   The whole design brief is speed.  A check-in that is a chore
+   does not get filled in, and a check-in that does not get
+   filled in is worth nothing at all — it is the one field that
+   carries readiness over its completeness floor.  So: the only
+   required answer is one tap, the save button never scrolls out
+   of reach, and everything else is visibly optional.
+   ───────────────────────────────────────────────────────────── */
+:root{
+  --bg:#080B10;
+  --veil-1: rgba(95,208,230,.13);
+  --veil-2: rgba(126,140,255,.09);
+  --surface: rgba(255,255,255,.045);
+  --surface-2: rgba(255,255,255,.075);
+  --hairline: rgba(255,255,255,.10);
+  --hairline-2: rgba(255,255,255,.20);
+  --ink:#EAF0F6;
+  --ink-2:#9BA9B8;
+  --ink-3:#68747F;
+  --accent:#5FD0E6;
+  --accent-soft: rgba(95,208,230,.16);
+  --good:#7CC46A;
+  --warn:#E9A94A;
+  --crit:#EE6C63;
+  --on-accent:#04161C;
+  --shadow: 0 20px 50px rgba(0,0,0,.45);
+  --glass-blur: saturate(150%) blur(20px);
+  --r-sm:10px; --r-md:16px; --r-lg:22px;
+  --f-display:"Sora","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --f-body:"Manrope","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#EEF1F5;
+    --veil-1: rgba(14,140,168,.12);
+    --veil-2: rgba(112,132,236,.10);
+    --surface: rgba(255,255,255,.74);
+    --surface-2: rgba(255,255,255,.94);
+    --hairline: rgba(12,22,32,.11);
+    --hairline-2: rgba(12,22,32,.22);
+    --ink:#0D141B;
+    --ink-2:#4B5866;
+    --ink-3:#7B8794;
+    --accent:#0E8CA8;
+    --accent-soft: rgba(14,140,168,.13);
+    --on-accent:#FFFFFF;
+    --good:#3F8F3A;
+    --warn:#9E6B14;
+    --crit:#C24A40;
+    --shadow: 0 18px 42px rgba(16,28,40,.10);
+  }
+}
+:root[data-theme="light"]{
+  --bg:#EEF1F5;
+  --veil-1: rgba(14,140,168,.12);
+  --veil-2: rgba(112,132,236,.10);
+  --surface: rgba(255,255,255,.74);
+  --surface-2: rgba(255,255,255,.94);
+  --hairline: rgba(12,22,32,.11);
+  --hairline-2: rgba(12,22,32,.22);
+  --ink:#0D141B;
+  --ink-2:#4B5866;
+  --ink-3:#7B8794;
+  --accent:#0E8CA8;
+  --accent-soft: rgba(14,140,168,.13);
+  --on-accent:#FFFFFF;
+  --good:#3F8F3A;
+  --warn:#9E6B14;
+  --crit:#C24A40;
+  --shadow: 0 18px 42px rgba(16,28,40,.10);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:
+    radial-gradient(1100px 620px at 12% -8%, var(--veil-1), transparent 62%),
+    radial-gradient(900px 560px at 92% 4%, var(--veil-2), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+  color:var(--ink);
+  font-family:var(--f-body);
+  font-size:15px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+:focus-visible{outline:2px solid var(--accent); outline-offset:3px; border-radius:8px}
+
+/* Room at the bottom for the save bar, plus the phone's home indicator. */
+.shell{
+  max-width:660px; margin:0 auto;
+  padding:22px 20px calc(150px + env(safe-area-inset-bottom));
+}
+.micro{
+  font-family:var(--f-mono); font-size:10px; font-weight:500;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3);
+}
+.num{font-family:var(--f-display); font-variant-numeric:tabular-nums; letter-spacing:-.02em}
+
+.topbar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:2px 2px 18px}
+.mark{display:flex; align-items:baseline; gap:10px; margin-right:auto}
+.mark b{font-family:var(--f-display); font-weight:600; font-size:16px; letter-spacing:.02em}
+.mark span{color:var(--ink-2); font-size:13px}
+.pill{
+  display:inline-flex; align-items:center; gap:7px;
+  padding:6px 11px; border-radius:999px;
+  border:1px solid var(--hairline); background:var(--surface);
+  backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+  font-family:var(--f-mono); font-size:10px; font-weight:500;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--ink-2);
+  white-space:nowrap; text-decoration:none;
+}
+.pill b{color:var(--ink); font-weight:600}
+a.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
+
+.card{
+  position:relative;
+  border:1px solid var(--hairline);
+  background:var(--surface);
+  backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+  border-radius:var(--r-lg);
+  padding:20px; margin-bottom:14px;
+  box-shadow:var(--shadow);
+}
+.card > .micro:first-child{display:block; margin-bottom:6px}
+.ask{font-family:var(--f-display); font-weight:600; font-size:19px; margin:0 0 4px}
+.hint{color:var(--ink-3); font-size:12.5px; margin:0 0 16px}
+
+/* ── the one required answer ── */
+.tenrow{display:grid; grid-template-columns:repeat(10,1fr); gap:6px}
+.ten{
+  -webkit-tap-highlight-color:transparent;
+  appearance:none; cursor:pointer;
+  aspect-ratio:1/1.15; min-height:46px;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid var(--hairline); border-radius:12px;
+  background:transparent; color:var(--ink-2);
+  font-family:var(--f-display); font-variant-numeric:tabular-nums;
+  font-size:15px; font-weight:600;
+  transition:transform .09s ease, background .12s ease, border-color .12s ease;
+}
+.ten:hover{border-color:var(--hairline-2); color:var(--ink)}
+.ten[aria-checked="true"]{
+  background:var(--accent); border-color:var(--accent); color:var(--on-accent);
+  transform:translateY(-2px);
+}
+.anchors{display:flex; justify-content:space-between; margin-top:9px}
+.anchors span{font-size:11.5px; color:var(--ink-3)}
+
+/* ── the optional scales ── */
+.scale{
+  display:flex; align-items:center; gap:12px;
+  padding:9px 0; border-top:1px solid var(--hairline);
+}
+.scale:first-of-type{border-top:none}
+.scale > .lab{flex:1 1 auto; min-width:0}
+.scale .lab b{display:block; font-size:13.5px; font-weight:600}
+.scale .lab i{
+  display:block; font-style:normal; font-size:11px; color:var(--ink-3);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.dots{display:flex; gap:5px; flex:0 0 auto}
+.dot{
+  -webkit-tap-highlight-color:transparent;
+  appearance:none; cursor:pointer;
+  width:38px; height:38px; border-radius:11px;
+  border:1px solid var(--hairline); background:transparent;
+  color:var(--ink-3); font-family:var(--f-mono); font-size:12px;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .12s ease, border-color .12s ease, color .12s ease;
+}
+.dot:hover{border-color:var(--hairline-2); color:var(--ink-2)}
+.dot[aria-checked="true"]{
+  background:var(--accent-soft); border-color:var(--accent); color:var(--accent); font-weight:500;
+}
+.scale.set .lab b{color:var(--ink)}
+.clear{
+  appearance:none; background:none; border:none; cursor:pointer;
+  color:var(--ink-3); font-family:var(--f-body); font-size:11.5px;
+  padding:4px 2px; text-decoration:underline; text-underline-offset:3px;
+}
+.clear:hover{color:var(--ink-2)}
+
+/* ── tags ── */
+.tags{display:flex; flex-wrap:wrap; gap:7px}
+.tag{
+  -webkit-tap-highlight-color:transparent;
+  font-family:var(--f-body); font-size:13px; padding:8px 13px; border-radius:999px;
+  border:1px solid var(--hairline); background:transparent; color:var(--ink-2); cursor:pointer;
+}
+.tag:hover{border-color:var(--hairline-2); color:var(--ink)}
+.tag[aria-pressed="true"]{background:var(--accent-soft); border-color:var(--accent); color:var(--accent)}
+
+/* ── note ── */
+textarea{
+  width:100%; min-height:84px; resize:vertical; margin-top:12px;
+  border:1px solid var(--hairline); border-radius:var(--r-md);
+  background:var(--surface-2); color:var(--ink);
+  font-family:var(--f-body); font-size:14px; padding:12px 13px;
+}
+textarea::placeholder{color:var(--ink-3)}
+
+/* ── the save bar: never scrolls away ── */
+.savebar{
+  position:fixed; left:0; right:0; bottom:0; z-index:20;
+  padding:12px 20px calc(12px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--hairline);
+  background:color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+}
+.savebar .inner{max-width:660px; margin:0 auto; display:flex; align-items:center; gap:12px}
+.cta{
+  flex:1 1 auto;
+  display:flex; align-items:center; justify-content:center; gap:9px;
+  padding:15px 18px; border-radius:var(--r-md); cursor:pointer;
+  background:var(--accent); border:none; color:var(--on-accent);
+  font-family:var(--f-body); font-weight:700; font-size:15px;
+}
+.cta[disabled]{
+  background:var(--surface-2); color:var(--ink-3); cursor:not-allowed;
+  border:1px solid var(--hairline);
+}
+.saidwhat{font-size:12px; color:var(--ink-3); text-align:right; flex:0 0 auto; max-width:44%}
+
+.banner{
+  display:none; align-items:center; gap:10px;
+  border-radius:var(--r-md); padding:12px 14px; margin-bottom:14px;
+  font-size:13.5px; border:1px solid var(--hairline);
+}
+.banner.show{display:flex}
+.banner.ok{border-color:color-mix(in srgb, var(--good) 55%, transparent); color:var(--good)}
+.banner.bad{border-color:color-mix(in srgb, var(--crit) 55%, transparent); color:var(--crit)}
+
+/* One column of scales, at every width.
+
+   Two columns were tried and clipped: a label needs about 120px and five
+   38px targets need 210, so a column wants 330 and the 660px shell has 299
+   to give. The right-hand 5 sat under the card edge — reachable by neither
+   thumb nor cursor, and invisible until something measured it. A shorter
+   page is not worth a control that cannot be pressed. */
+/* Ten targets across a phone leaves each one about 32px wide and pushes the
+   last two off the screen — and those two are 9 and 10, on the only control
+   the check-in actually requires. Two rows of five are wider than one row of
+   ten, not narrower. */
+@media (max-width:520px){
+  .tenrow{grid-template-columns:repeat(5,1fr); gap:7px}
+  .ten{aspect-ratio:auto; min-height:52px; font-size:16px}
+}
+@media (max-width:560px){
+  .shell{padding:18px 14px calc(150px + env(safe-area-inset-bottom))}
+  .savebar{padding-left:14px; padding-right:14px}
+  .dot{width:36px; height:36px}
+  /* The anchors stay. They are the answer to "is 5 a lot of stress or a
+     little?", and that question costs more hesitation on a phone at 7am
+     than anywhere else. Stacked under the label rather than dropped. */
+  .scale{flex-wrap:wrap; gap:8px}
+  .scale > .lab{flex:1 1 100%}
+  .dots{margin-left:auto}
+}
+@media (prefers-reduced-motion: reduce){
+  .ten,.dot{transition:none}
+  .ten[aria-checked="true"]{transform:none}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="topbar">
+    <div class="mark"><b>Check-in</b><span id="when">—</span></div>
+    <button class="pill" id="dayToggle" type="button" title="Check in for an earlier day">
+      <span id="dayLabel">Today</span>
+    </button>
+    <span class="pill" id="streak" hidden>Streak <b id="streakN">0</b></span>
+    <a class="pill" href="/ui">Today screen</a>
+  </div>
+
+  <div class="banner" id="banner" role="status" aria-live="polite"><span id="bannerText"></span></div>
+
+  <!-- The only required answer. One tap and the check-in is valid. -->
+  <section class="card">
+    <span class="micro">Required · one tap</span>
+    <h1 class="ask">Overall, how do you feel?</h1>
+    <p class="hint">This is the only answer the score needs. Everything below is optional.</p>
+    <div class="tenrow" id="tenrow" role="radiogroup" aria-label="Overall, 1 to 10"></div>
+    <div class="anchors"><span>1 · wretched</span><span>10 · excellent</span></div>
+  </section>
+
+  <!-- Optional detail. Laid out so a full pass is seven taps, not seven screens. -->
+  <section class="card">
+    <span class="micro">Optional detail</span>
+    <h2 class="ask" style="font-size:16px">Anything you want to add?</h2>
+    <p class="hint">Skip freely — a partial check-in beats none, and blanks stay blank rather than becoming zeros.</p>
+    <div class="scales" id="scales"></div>
+  </section>
+
+  <section class="card">
+    <span class="micro">Anything that might explain today</span>
+    <div class="tags" id="tags" style="margin-top:12px"></div>
+  </section>
+
+  <section class="card">
+    <span class="micro">Note</span>
+    <textarea id="note" rows="3" placeholder="Anything worth remembering about today (optional)"></textarea>
+  </section>
+
+</div>
+
+<div class="savebar">
+  <div class="inner">
+    <button class="cta" id="save" type="button" disabled>Pick a number first</button>
+    <span class="saidwhat" id="saidwhat"></span>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* The token is shared with the Today screen: one key, one prompt, both
+     pages authenticated by the same paste. */
+  var TOKEN_KEY = 'health-dashboard-token';
+  var API = '/api/v1/checkin';
+
+  /* Each scale's anchors are spelled out because "is 5 a lot of stress or a
+     little?" is both a hesitation and, answered inconsistently over months, a
+     corrupted baseline. Direction is stated, never inferred. */
+  var SCALES = [
+    ['energy_1_5',        'Energy',        'flat → buzzing'],
+    ['mood_1_5',          'Mood',          'low → great'],
+    ['sleep_quality_1_5', 'Sleep quality', 'poor → excellent'],
+    ['soreness_1_5',      'Soreness',      'none → severe'],
+    ['motivation_1_5',    'Motivation',    'none → driven'],
+    ['focus_1_5',         'Focus',         'scattered → sharp'],
+    ['stress_1_5',        'Stress',        'calm → frazzled']
+  ];
+
+  var TAGS = [
+    ['alcohol','Alcohol'], ['late_meal','Late meal'], ['late_caffeine','Late caffeine'],
+    ['poor_sleep_env','Poor sleep env'], ['work_stress','Work stress'], ['travel','Travel'],
+    ['illness','Illness'], ['hangover','Hangover'], ['late_screen','Late screen'],
+    ['dehydrated','Dehydrated'], ['no_watch','No watch'], ['headache','Headache'],
+    ['sore_throat','Sore throat']
+  ];
+
+  /* The API refuses a backfill older than this, so the page must not offer
+     one. Recall past a few days is not reliable enough to correlate against. */
+  var MAX_BACKFILL_DAYS = 3;
+
+  var state = { overall:null, scales:{}, tags:{}, offset:0 };
+
+  function el(id){ return document.getElementById(id); }
+
+  function token(){
+    var t = null;
+    try { t = window.localStorage.getItem(TOKEN_KEY); } catch (e) { t = null; }
+    if (!t) {
+      t = window.prompt('API token (API_TOKEN from your .env)');
+      if (t) { try { window.localStorage.setItem(TOKEN_KEY, t); } catch (e) {} }
+    }
+    return t;
+  }
+
+  function localDate(offset){
+    var d = new Date();
+    d.setDate(d.getDate() - offset);
+    return d;
+  }
+  function iso(d){
+    return d.getFullYear() + '-' +
+      String(d.getMonth()+1).padStart(2,'0') + '-' +
+      String(d.getDate()).padStart(2,'0');
+  }
+  /* UK order throughout the project: 11-09-2026, never 09/11/2026. */
+  function uk(d){
+    return String(d.getDate()).padStart(2,'0') + '-' +
+      String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear();
+  }
+
+  function say(kind, text){
+    var b = el('banner');
+    b.className = 'banner show ' + kind;
+    el('bannerText').textContent = text;
+  }
+  function hush(){ el('banner').className = 'banner'; }
+
+  // ── build ────────────────────────────────────────────────────────────
+  var row = el('tenrow');
+  for (var n = 1; n <= 10; n++){
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'ten'; b.textContent = n;
+    b.setAttribute('role','radio'); b.setAttribute('aria-checked','false');
+    b.dataset.n = n;
+    b.addEventListener('click', pickOverall);
+    row.appendChild(b);
+  }
+
+  SCALES.forEach(function(s){
+    var wrap = document.createElement('div');
+    wrap.className = 'scale'; wrap.dataset.field = s[0];
+    wrap.innerHTML = '<div class="lab"><b>' + s[1] + '</b><i>' + s[2] + '</i></div>';
+    var dots = document.createElement('div');
+    dots.className = 'dots'; dots.setAttribute('role','radiogroup');
+    dots.setAttribute('aria-label', s[1] + ', 1 to 5, ' + s[2]);
+    for (var v = 1; v <= 5; v++){
+      var d = document.createElement('button');
+      d.type = 'button'; d.className = 'dot'; d.textContent = v;
+      d.setAttribute('role','radio'); d.setAttribute('aria-checked','false');
+      d.dataset.field = s[0]; d.dataset.v = v;
+      d.addEventListener('click', pickScale);
+      dots.appendChild(d);
+    }
+    wrap.appendChild(dots);
+    el('scales').appendChild(wrap);
+  });
+
+  TAGS.forEach(function(t){
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'tag'; b.textContent = t[1];
+    b.setAttribute('aria-pressed','false'); b.dataset.tag = t[0];
+    b.addEventListener('click', function(){
+      var on = b.getAttribute('aria-pressed') === 'true';
+      b.setAttribute('aria-pressed', on ? 'false' : 'true');
+      if (on) { delete state.tags[t[0]]; } else { state.tags[t[0]] = true; }
+      refresh();
+    });
+    el('tags').appendChild(b);
+  });
+
+  // ── interaction ──────────────────────────────────────────────────────
+  function pickOverall(e){
+    var n = Number(e.currentTarget.dataset.n);
+    state.overall = n;
+    Array.prototype.forEach.call(row.children, function(b){
+      b.setAttribute('aria-checked', Number(b.dataset.n) === n ? 'true' : 'false');
+    });
+    hush();
+    refresh();
+  }
+
+  function pickScale(e){
+    var field = e.currentTarget.dataset.field;
+    var v = Number(e.currentTarget.dataset.v);
+    // Tapping the selected value again clears it: an optional field has to be
+    // un-answerable, or a mis-tap becomes a number nobody meant.
+    state.scales[field] = (state.scales[field] === v) ? null : v;
+    paintScale(field);
+    refresh();
+  }
+
+  function paintScale(field){
+    var wrap = document.querySelector('.scale[data-field="' + field + '"]');
+    var v = state.scales[field];
+    Array.prototype.forEach.call(wrap.querySelectorAll('.dot'), function(d){
+      d.setAttribute('aria-checked', Number(d.dataset.v) === v ? 'true' : 'false');
+    });
+    wrap.classList.toggle('set', v != null);
+  }
+
+  /* Number keys on a desktop keyboard: 1-9 and 0 for ten. Costs nothing and
+     turns the required answer into a single keystroke. */
+  document.addEventListener('keydown', function(e){
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (document.activeElement && document.activeElement.tagName === 'TEXTAREA') return;
+    if (e.key >= '1' && e.key <= '9') {
+      row.children[Number(e.key) - 1].click();
+    } else if (e.key === '0') {
+      row.children[9].click();
+    } else if (e.key === 'Enter' && state.overall != null) {
+      submit();
+    }
+  });
+
+  function extrasCount(){
+    var n = Object.keys(state.tags).length;
+    SCALES.forEach(function(s){ if (state.scales[s[0]] != null) n++; });
+    if (el('note').value.trim()) n++;
+    return n;
+  }
+
+  function refresh(){
+    var ready = state.overall != null;
+    var save = el('save');
+    save.disabled = !ready;
+    save.textContent = ready ? ('Save ' + state.overall + '/10') : 'Pick a number first';
+    var extras = extrasCount();
+    el('saidwhat').textContent = ready
+      ? (extras ? extras + ' extra' + (extras === 1 ? '' : 's') : 'that is enough')
+      : '';
+  }
+  el('note').addEventListener('input', refresh);
+
+  // ── the day being checked in for ─────────────────────────────────────
+  function paintDay(){
+    var d = localDate(state.offset);
+    el('when').textContent = uk(d);
+    el('dayLabel').textContent =
+      state.offset === 0 ? 'Today' : (state.offset === 1 ? 'Yesterday' : state.offset + ' days ago');
+  }
+  el('dayToggle').addEventListener('click', function(){
+    state.offset = (state.offset + 1) % (MAX_BACKFILL_DAYS + 1);
+    paintDay();
+    hush();
+    load();
+  });
+
+  // ── load: streak, and today's answers if there are any ───────────────
+  function applyPrefill(p){
+    state.overall = null; state.scales = {}; state.tags = {};
+    Array.prototype.forEach.call(row.children, function(b){ b.setAttribute('aria-checked','false'); });
+    Array.prototype.forEach.call(el('tags').children, function(b){ b.setAttribute('aria-pressed','false'); });
+    el('note').value = '';
+
+    if (p) {
+      if (p.overall_1_10) {
+        state.overall = p.overall_1_10;
+        row.children[p.overall_1_10 - 1].setAttribute('aria-checked','true');
+      }
+      SCALES.forEach(function(s){
+        if (p[s[0]] != null) state.scales[s[0]] = p[s[0]];
+      });
+      (p.tags || []).forEach(function(t){
+        state.tags[t] = true;
+        var b = el('tags').querySelector('[data-tag="' + t + '"]');
+        if (b) b.setAttribute('aria-pressed','true');
+      });
+      el('note').value = p.free_text || '';
+    }
+    SCALES.forEach(function(s){ paintScale(s[0]); });
+    refresh();
+  }
+
+  /* `quiet` is set by the save path. Without it the reload that follows a
+     save overwrites "Saved" with "Already checked in today" a heartbeat
+     later, so the one piece of feedback that matters never gets read. */
+  function load(quiet){
+    var t = token();
+    if (!t) return;
+    fetch(API + '/status', {headers:{Authorization:'Bearer ' + t}})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(s){
+        if (!s) return;
+        if (s.streak_days) {
+          el('streak').hidden = false;
+          el('streakN').textContent = s.streak_days;
+        } else {
+          el('streak').hidden = true;
+        }
+        // /status describes today only, so its prefill is only today's.
+        applyPrefill(state.offset === 0 ? s.prefill : null);
+        if (!quiet && state.offset === 0 && s.submitted) {
+          say('ok', 'Already checked in today. Changing anything and saving replaces it.');
+        }
+      })
+      .catch(function(){ /* the form still works; it just starts blank */ });
+  }
+
+  // ── save ─────────────────────────────────────────────────────────────
+  function submit(){
+    if (state.overall == null) return;
+    var t = token();
+    if (!t) return;
+
+    var body = {
+      date: iso(localDate(state.offset)),
+      overall_1_10: state.overall,
+      tags: Object.keys(state.tags)
+    };
+    SCALES.forEach(function(s){
+      if (state.scales[s[0]] != null) body[s[0]] = state.scales[s[0]];
+    });
+    var note = el('note').value.trim();
+    if (note) body.free_text = note;
+
+    var save = el('save');
+    save.disabled = true; save.textContent = 'Saving…';
+
+    fetch(API, {
+      method:'POST',
+      headers:{'Content-Type':'application/json', Authorization:'Bearer ' + t},
+      body: JSON.stringify(body)
+    })
+      .then(function(r){
+        if (r.ok) return r.json();
+        return r.json().then(function(e){
+          throw new Error((e && e.detail) ? e.detail : ('HTTP ' + r.status));
+        }, function(){ throw new Error('HTTP ' + r.status); });
+      })
+      .then(function(){
+        say('ok', 'Saved. That is the completeness floor cleared for ' +
+                  uk(localDate(state.offset)) + '.');
+        window.scrollTo({top:0, behavior:'smooth'});
+        load(true);
+      })
+      .catch(function(err){
+        say('bad', String(err.message || err));
+        refresh();
+      });
+  }
+  el('save').addEventListener('click', submit);
+
+  paintDay();
+  refresh();
+  load();
+})();
+</script>
+</body>
+</html>

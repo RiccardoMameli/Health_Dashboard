@@ -22,14 +22,33 @@ from fastapi.responses import FileResponse
 
 router = APIRouter(tags=["ui"])
 
-UI_FILE = Path(__file__).resolve().parent.parent.parent / "docs" / "ui" / "glacier-today.html"
+UI_DIR = Path(__file__).resolve().parent.parent.parent / "docs" / "ui"
+UI_FILE = UI_DIR / "glacier-today.html"
+CHECKIN_FILE = UI_DIR / "glacier-checkin.html"
+
+
+def _page(path: Path) -> FileResponse:
+    if not path.exists():  # pragma: no cover - only if the repo is incomplete
+        raise HTTPException(status_code=404, detail="UI reference file not found")
+    # no-store: the file is edited by hand during design work, and a cached
+    # copy of yesterday's layout is a confusing thing to debug.
+    return FileResponse(path, media_type="text/html", headers={"Cache-Control": "no-store"})
 
 
 @router.get("/ui", include_in_schema=False)
 def today_screen() -> FileResponse:
     """The Today screen. Served from source so editing it needs no build step."""
-    if not UI_FILE.exists():  # pragma: no cover - only if the repo is incomplete
-        raise HTTPException(status_code=404, detail="UI reference file not found")
-    # no-store: the file is edited by hand during design work, and a cached
-    # copy of yesterday's layout is a confusing thing to debug.
-    return FileResponse(UI_FILE, media_type="text/html", headers={"Cache-Control": "no-store"})
+    return _page(UI_FILE)
+
+
+@router.get("/ui/checkin", include_in_schema=False)
+def checkin_form() -> FileResponse:
+    """The morning check-in.
+
+    The subjective field this collects is the one that carries readiness over
+    its 60% completeness floor: Samsung supplies four of the seven expected
+    fields, which is 57.1%. Every other integration in the plan is worth less
+    to the score than one tap here, which is why the page is built for speed
+    before anything else.
+    """
+    return _page(CHECKIN_FILE)

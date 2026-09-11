@@ -282,3 +282,54 @@ def test_ui_has_no_duplicated_markup(client):
     ids = re.findall(r'\bid="([^"]+)"', client.get("/ui").text)
     duplicates = sorted({i for i in ids if ids.count(i) > 1})
     assert not duplicates, f"duplicated ids: {duplicates}"
+
+
+# ── the check-in form ───────────────────────────────────────────────────────
+
+
+def test_checkin_form_is_served(client):
+    response = client.get("/ui/checkin")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_checkin_form_offers_every_field_the_api_accepts(client):
+    """A field the model stores and the form cannot reach is a column that
+    stays NULL forever without anyone noticing."""
+    from app.models import CONFOUNDER_TAGS
+    from app.schemas.checkin import CheckinIn
+
+    body = client.get("/ui/checkin").text
+    for field in CheckinIn.model_fields:
+        if field == "date":
+            continue                       # chosen by the day toggle, not a field
+        assert field in body, f"{field} is not reachable from the form"
+    for tag in CONFOUNDER_TAGS:
+        quoted = (f"'{tag}'", f'"{tag}"')
+        assert any(q in body for q in quoted), f"{tag} is not offered"
+
+
+def test_checkin_form_does_not_offer_a_backfill_the_api_will_refuse(client):
+    """The page must not present a day the API rejects — an error after the
+    effort of filling it in is exactly how a daily habit dies."""
+    from app.api.routes_checkin import MAX_BACKFILL_DAYS
+
+    body = client.get("/ui/checkin").text
+    assert f"MAX_BACKFILL_DAYS = {MAX_BACKFILL_DAYS}" in body
+
+
+def test_checkin_form_needs_only_the_overall_score(client):
+    """The whole design rests on one tap being a valid check-in. If the
+    schema ever makes a second field required, this page becomes a lie."""
+    from app.schemas.checkin import CheckinIn
+
+    required = {name for name, f in CheckinIn.model_fields.items() if f.is_required()}
+    assert required == {"overall_1_10"}
+
+
+def test_the_today_screen_links_to_the_form_and_no_longer_fakes_it(client):
+    body = client.get("/ui").text
+    assert 'href="/ui/checkin"' in body
+    assert 'class="card soon checkin' not in body     # it is built now
+    assert "Check in · about 25 seconds" not in body  # the placeholder's promise
