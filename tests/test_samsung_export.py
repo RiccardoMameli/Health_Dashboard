@@ -247,3 +247,21 @@ def test_the_metadata_line_is_recognised_even_when_it_is_the_same_width():
     )
     rows = read_rows(raw)
     assert rows[0]["com.samsung.health.heart_rate.heart_rate"] == "66.0"
+
+
+def test_a_blank_column_name_does_not_shift_the_ones_after_it():
+    """Samsung's wider files carry empty header cells. Dropping a blank name
+    from the header before zipping slides every later name onto the previous
+    column's value: a dict with the right keys and the wrong values, which is
+    indistinguishable from working code until a date fails to parse."""
+    raw = csv_bytes(
+        "com.samsung.shealth.sleep",
+        ["com.samsung.health.sleep.start_time", "", "com.samsung.health.sleep.end_time"],
+        [["2024-01-28 22:47:00.000", "junk", "2024-01-29 06:31:00.000"]],
+    )
+    assert read_rows(raw) == [
+        {
+            "com.samsung.health.sleep.start_time": "2024-01-28 22:47:00.000",
+            "com.samsung.health.sleep.end_time": "2024-01-29 06:31:00.000",
+        }
+    ]

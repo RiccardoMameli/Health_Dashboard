@@ -54,6 +54,11 @@ from app.services.timeutil import sleep_day  # noqa: E402
 
 SOURCE = "samsung_health"
 
+#: The two columns the basis check reads. Named because the diagnostic script
+#: reports against them and the two must not drift apart.
+SLEEP_START_COLUMN = "com.samsung.health.sleep.start_time"
+SLEEP_OFFSET_COLUMN = "com.samsung.health.sleep.time_offset"
+
 #: Which source rows are kept verbatim, and the columns that identify one.
 #: The first column present and non-empty wins, so an export that carries
 #: Samsung's own uuid uses it and one that does not falls back to the
@@ -112,14 +117,31 @@ def establish_basis(files: dict, override: str | None) -> str | None:
         print(f"  ! no {SLEEP_FILE} in the export; cannot establish the basis")
         return None
 
+    # Three different failures used to arrive here as the same sentence. A
+    # file that parses to nothing is a format problem, not an ambiguous
+    # timezone, and saying "no usable offsets" about it sends the reader
+    # looking in the wrong place.
+    rows = read_rows(raw)
+    if not rows:
+        print(f"  ! {SLEEP_FILE} parsed to zero rows — the header was not found")
+        print("    Run scripts/diagnose_samsung_sleep.py against the export.")
+        return None
+
     samples = [
         (
-            parse_naive(row.get("com.samsung.health.sleep.start_time")),
-            parse_offset(row.get("com.samsung.health.sleep.time_offset")),
+            parse_naive(row.get(SLEEP_START_COLUMN)),
+            parse_offset(row.get(SLEEP_OFFSET_COLUMN)),
         )
-        for row in read_rows(raw)
+        for row in rows
     ]
     samples = [(n, o) for n, o in samples if n is not None]
+    if not samples:
+        print(f"  ! {len(rows):,} rows parsed, but none carried a readable "
+              f"{SLEEP_START_COLUMN}")
+        print(f"    Columns present: {', '.join(sorted(rows[0])[:6])}...")
+        print("    Run scripts/diagnose_samsung_sleep.py against the export.")
+        return None
+
     verdict = detect_timestamp_basis(samples)
 
     print(f"  {len(samples)} sleep records, "

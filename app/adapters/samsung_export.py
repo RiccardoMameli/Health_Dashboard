@@ -102,11 +102,14 @@ def read_rows(raw: bytes) -> list[dict[str, str]]:
         # and lost the entire file.
         if agreement > best_agreement:
             best_index, best_columns, best_agreement = index, fields, agreement
-    best_columns = [c for c in best_columns if c]
-    if not best_columns:
+    # Blank column names are dropped *after* zipping, never before. Removing
+    # them from the header first shifts every later name onto the previous
+    # column's value, which produces a dict with all the right keys and all
+    # the wrong values — the failure that looks like working code.
+    if not any(best_columns):
         return []
     return [
-        dict(zip(best_columns, row, strict=False))
+        {name: value for name, value in zip(best_columns, row, strict=False) if name}
         for row in csv.reader(lines[best_index + 1 :])
         if any(f.strip() for f in row)
     ]
