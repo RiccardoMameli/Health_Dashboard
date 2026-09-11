@@ -158,9 +158,14 @@ def establish_basis(files: dict, override: str | None) -> str | None:
 
     print(f"  {len(samples)} sleep records, "
           f"{verdict.standard_count} in standard time and {verdict.daylight_count} in daylight")
-    print(f"  reading them as local leaves a {verdict.shift_if_local_hours:.2f}h seasonal shift")
-    print(f"  reading them as UTC   leaves a {verdict.shift_if_utc_hours:.2f}h seasonal shift")
+    print(f"  compared {verdict.window}")
+    print(f"  reading them as local leaves a {verdict.shift_if_local_hours:.2f}h shift")
+    print(f"  reading them as UTC   leaves a {verdict.shift_if_utc_hours:.2f}h shift")
     print(f"  -> {verdict.note}")
+    if verdict.window != "clock change":
+        print("     ! no clock change had enough records either side, so this")
+        print("       rests on winter against summer, which seasonal bedtime")
+        print("       drift can bias in either direction.")
     return verdict.basis
 
 
