@@ -327,3 +327,92 @@ def test_travel_alone_cannot_produce_a_verdict():
         (datetime(2024, 9, 1) + timedelta(days=i, hours=23), 540) for i in range(3)
     ]
     assert detect_timestamp_basis(samples).basis is None
+
+
+def _uk_offset(when: datetime) -> int:
+    """BST between the last Sunday in March and the last in October, near
+    enough for a fixture."""
+    return BST if datetime(when.year, 3, 31) <= when <= datetime(when.year, 10, 27) else GMT
+
+
+def _nights(start: datetime, count: int, bedtime, *, step: int = 1):
+    """One record per `step` days, bedtime a function of the date."""
+    out = []
+    for index in range(count):
+        day = start + timedelta(days=index * step)
+        hour, minute = bedtime(day)
+        out.append((day.replace(hour=hour, minute=minute), _uk_offset(day)))
+    return out
+
+
+def test_seasonal_bedtime_drift_does_not_move_the_verdict():
+    """Bedtime drifts from 22:30 in midwinter to 23:30 at midsummer, ordinary
+    behaviour, and the timestamps are local. The drift is noise on the
+    comparison either way — a later summer bedtime biases towards `local` and
+    an earlier one towards `utc` — and across a clock change it is minutes,
+    so the verdict rests on the hour and not on the habit."""
+    def drifting(day: datetime) -> tuple[int, int]:
+        # Peaks at midsummer, troughs at midwinter: a full hour, smoothly.
+        from math import cos, pi
+        day_of_year = day.timetuple().tm_yday
+        fraction = (1 - cos(2 * pi * (day_of_year - 172) / 365)) / 2
+        minutes = int(22 * 60 + 30 + 60 * (1 - fraction))
+        return minutes // 60, minutes % 60
+
+    samples = _nights(datetime(2022, 1, 1), 700, drifting, step=2)
+    verdict = detect_timestamp_basis(samples)
+    assert verdict.window == "clock change"
+    assert verdict.basis == BASIS_LOCAL
+
+
+def test_utc_timestamps_are_still_called_utc_across_the_clock_change():
+    """The sharp test must not simply always answer 'local'. Same drifting
+    sleeper, but the file stores UTC, so each record's wall clock is the local
+    bedtime minus the offset."""
+    def drifting(day: datetime) -> tuple[int, int]:
+        from math import cos, pi
+        day_of_year = day.timetuple().tm_yday
+        fraction = (1 - cos(2 * pi * (day_of_year - 172) / 365)) / 2
+        minutes = int(22 * 60 + 30 + 60 * (1 - fraction))
+        return minutes // 60, minutes % 60
+
+    samples = [
+        (naive - timedelta(minutes=offset), offset)
+        for naive, offset in _nights(datetime(2022, 1, 1), 700, drifting, step=2)
+    ]
+    verdict = detect_timestamp_basis(samples)
+    assert verdict.window == "clock change"
+    assert verdict.basis == BASIS_UTC
+
+
+def test_it_says_when_it_fell_back_to_the_confoundable_comparison():
+    """Records nowhere near a clock change can only be compared season to
+    season, and the verdict has to carry that caveat rather than read as
+    proven."""
+    samples = (
+        _nights(datetime(2024, 1, 5), 40, lambda d: (23, 0))        # deep winter
+        + _nights(datetime(2024, 6, 5), 40, lambda d: (23, 0))      # deep summer
+    )
+    verdict = detect_timestamp_basis(samples)
+    assert verdict.window == "whole seasons"
+    assert "confound" in verdict.note
+
+
+def test_an_earlier_summer_bedtime_does_not_forge_a_utc_verdict():
+    """This is the direction that can actually invert the answer. Bedtime
+    moves an hour *earlier* by midsummer with local timestamps, which under a
+    whole-season comparison looks exactly like a file storing UTC and would
+    push every summer night onto the wrong day. The clock-change window has to
+    return `local` regardless."""
+    from math import cos, pi
+
+    def earlier_in_summer(day: datetime) -> tuple[int, int]:
+        day_of_year = day.timetuple().tm_yday
+        fraction = (1 - cos(2 * pi * (day_of_year - 172) / 365)) / 2
+        minutes = int(22 * 60 + 30 + 60 * fraction)   # inverted against the drift test
+        return minutes // 60, minutes % 60
+
+    samples = _nights(datetime(2022, 1, 1), 700, earlier_in_summer, step=2)
+    verdict = detect_timestamp_basis(samples)
+    assert verdict.window == "clock change"
+    assert verdict.basis == BASIS_LOCAL

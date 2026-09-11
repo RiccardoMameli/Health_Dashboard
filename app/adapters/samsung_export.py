@@ -72,6 +72,21 @@ MIN_HEADER_CELLS = 2
 #: apart, which is what distinguishes it from a pair of travel offsets.
 DST_STEP_MINUTES = 60
 
+#: How far either side of a clock change the test looks. Bedtimes drift with
+#: the season — later in summer for most people, earlier for some — and a
+#: whole-season comparison cannot separate that drift from a timezone error,
+#: because both move the summer group. The direction decides which way it
+#: lies: a later summer bedtime biases towards `local`, an earlier one
+#: towards `utc`. Across six weeks the drift is minutes, while a timezone
+#: error is still the full hour, because one is gradual and the other is a
+#: step at the transition instant.
+DST_WINDOW_DAYS = 21
+
+#: Two records bracketing an offset change locate the change only if they are
+#: close together. Further apart than this and the transition date is not
+#: known well enough to centre a window on.
+MAX_TRANSITION_BRACKET_DAYS = 14
+
 #: Records at the epoch are sentinels, not observations. The real export has
 #: one in the HRV file. Stored, it would sit in every baseline window forever.
 EPOCH_CUTOFF = datetime(1990, 1, 1, tzinfo=UTC)
@@ -215,6 +230,12 @@ class BasisVerdict:
     standard_count: int
     daylight_count: int
     note: str
+    #: "clock change" when the verdict came from the narrow windows either
+    #: side of a transition, "whole seasons" when it fell back to comparing
+    #: winter against summer. The fallback is confoundable by seasonal
+    #: bedtime drift and a caller should say so rather than present the two
+    #: as equally proven.
+    window: str = "whole seasons"
 
     @property
     def confident(self) -> bool:
@@ -237,6 +258,30 @@ def format_offset(minutes: int) -> str:
     return f"UTC{sign}{abs(minutes) // 60:02d}{abs(minutes) % 60:02d}"
 
 
+def _transitions(
+    samples: list[tuple[datetime, int | None]], standard: int, daylight: int
+) -> list[datetime]:
+    """When the clock changed, located from the records rather than assumed.
+
+    Two consecutive records whose offset differs bracket a transition. If they
+    are far apart the date is not pinned down well enough to be useful, so
+    that transition is dropped rather than guessed at.
+    """
+    seasonal = sorted(
+        (naive, offset) for naive, offset in samples if offset in (standard, daylight)
+    )
+    out: list[datetime] = []
+    for (before, offset_before), (after, offset_after) in zip(
+        seasonal, seasonal[1:], strict=False
+    ):
+        if offset_before == offset_after:
+            continue
+        if after - before > timedelta(days=MAX_TRANSITION_BRACKET_DAYS):
+            continue
+        out.append(before + (after - before) / 2)
+    return out
+
+
 def detect_timestamp_basis(
     samples: list[tuple[datetime, int | None]],
     *,
@@ -245,17 +290,27 @@ def detect_timestamp_basis(
 ) -> BasisVerdict:
     """Decide whether Samsung's timestamps are local wall-clock or UTC.
 
-    The test uses the seasons against each other. Under the correct reading,
-    bedtimes look the same in winter and summer — people go to bed at a time,
-    not at an offset. Under the wrong one, every summer record shifts by
-    exactly the daylight-saving hour and the two groups separate.
+    The test plays the two sides of a clock change against each other. Under
+    the correct reading a bedtime is the same on the Saturday and the Sunday.
+    Under the wrong one every record after the change shifts by exactly the
+    daylight-saving hour.
 
-    So: split the samples by whether their offset is the standard one or the
-    daylight one, compute the mean bedtime of each group under both readings,
-    and take the reading whose seasonal gap is the smaller. If neither gap is
-    clearly smaller, or either group is too thin, this returns no verdict —
-    guessing here is how sleep silently lands on the wrong day for half of
-    every year.
+    It is deliberately measured across a clock change and not across the
+    seasons. Bedtimes drift with the season by something approaching an hour,
+    and a winter-against-summer comparison cannot separate that drift from the
+    error being looked for, because both move the summer group. Which way it
+    lies depends on the sleeper: going to bed later in summer biases the
+    answer towards `local`, going to bed earlier biases it towards `utc`.
+    Three weeks either side of a transition the drift is minutes while the
+    timezone error is still the whole hour, because one is gradual and the
+    other is a step.
+
+    Where a transition cannot be located, or too few records sit near one,
+    this falls back to the whole-season comparison and says so in `window`,
+    because that answer is the confoundable one and should not be presented
+    as equally proven. If neither reading is clearly better, or either group
+    is too thin, it returns no verdict — guessing here is how sleep silently
+    lands on the wrong day for half of every year.
     """
     offsets = [o for _, o in samples if o is not None]
     if not offsets:
@@ -289,9 +344,11 @@ def detect_timestamp_basis(
         common = sorted(o for o, _ in counts.most_common(2))
         standard_offset, daylight_offset = common[0], common[1]
 
-    def gap(basis: str) -> tuple[float, int, int]:
+    def gap(
+        basis: str, population: list[tuple[datetime, int | None]]
+    ) -> tuple[float, int, int]:
         groups: dict[int, list[float]] = {standard_offset: [], daylight_offset: []}
-        for naive, offset in samples:
+        for naive, offset in population:
             if offset not in groups:
                 continue
             instant = to_utc(naive, offset, basis)
@@ -305,8 +362,21 @@ def detect_timestamp_basis(
         difference = (raw_difference + 12) % 24 - 12
         return abs(difference), len(standard), len(daylight)
 
-    local_gap, standard_n, daylight_n = gap(BASIS_LOCAL)
-    utc_gap, _, _ = gap(BASIS_UTC)
+    # The records within three weeks of a clock change, which is the
+    # comparison that is not confounded by summer bedtimes. Everything else is
+    # the fallback.
+    changes = _transitions(samples, standard_offset, daylight_offset)
+    span = timedelta(days=DST_WINDOW_DAYS)
+    near = [s for s in samples if any(abs(s[0] - change) <= span for change in changes)]
+
+    window = "clock change"
+    local_gap, standard_n, daylight_n = gap(BASIS_LOCAL, near)
+    if local_gap != local_gap:                      # NaN: not enough near a change
+        window = "whole seasons"
+        local_gap, standard_n, daylight_n = gap(BASIS_LOCAL, samples)
+        utc_gap, _, _ = gap(BASIS_UTC, samples)
+    else:
+        utc_gap, _, _ = gap(BASIS_UTC, near)
 
     if local_gap != local_gap or utc_gap != utc_gap:  # NaN: too few in a group
         return BasisVerdict(
@@ -314,19 +384,27 @@ def detect_timestamp_basis(
             f"need {min_per_group} samples either side of a daylight-saving "
             f"change; {format_offset(standard_offset)} has {standard_n} and "
             f"{format_offset(daylight_offset)} has {daylight_n}",
+            window,
         )
 
     if abs(local_gap - utc_gap) < decisive_hours:
         return BasisVerdict(
             None, local_gap, utc_gap, standard_n, daylight_n,
             "the two readings fit the data equally well, so neither is proven",
+            window,
         )
 
     basis = BASIS_LOCAL if local_gap < utc_gap else BASIS_UTC
+    measured = (
+        "across the clock change"
+        if window == "clock change"
+        else "across whole seasons, which summer bedtimes can confound"
+    )
     return BasisVerdict(
         basis, local_gap, utc_gap, standard_n, daylight_n,
-        f"reading them as {basis} leaves a {min(local_gap, utc_gap):.2f}h seasonal "
-        f"gap against {max(local_gap, utc_gap):.2f}h for the alternative",
+        f"reading them as {basis} leaves a {min(local_gap, utc_gap):.2f}h gap "
+        f"{measured} against {max(local_gap, utc_gap):.2f}h for the alternative",
+        window,
     )
 
 
