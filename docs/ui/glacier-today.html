@@ -327,6 +327,7 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
   padding:13px 18px; border-radius:var(--r-md); cursor:pointer;
   background:var(--accent); border:none; color:var(--on-accent);
   font-family:var(--f-body); font-weight:700; font-size:14.5px; letter-spacing:.01em;
+  text-decoration:none;   /* the check-in CTA is a link, not a button */
 }
 .cta:hover{filter:brightness(1.08)}
 
@@ -836,32 +837,15 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
 
 
     <!-- ───────── check-in ───────── -->
-    <section class="card soon checkin span-4" aria-labelledby="ci">
-      <span class="soonTag">Coming soon</span>
+    <section class="card checkin span-4" aria-labelledby="ci">
       <span class="micro" id="ci">Check-in</span>
-      <div class="sliders" aria-hidden="true">
-        <div class="slider"><span class="lbl">Energy</span>
-          <span class="pips"><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip"></i><i class="pip"></i></span></div>
-        <div class="slider"><span class="lbl">Sleep quality</span>
-          <span class="pips"><i class="pip on"></i><i class="pip on"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></span></div>
-        <div class="slider"><span class="lbl">Stress</span>
-          <span class="pips"><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip"></i></span></div>
-      </div>
       <div>
-        <span class="micro" style="display:block; margin-bottom:9px">Tags · 13 available</span>
-        <div class="tags">
-          <button class="tag" type="button" aria-pressed="true">Late screen</button>
-          <button class="tag" type="button" aria-pressed="true">Work stress</button>
-          <button class="tag" type="button" aria-pressed="false">Alcohol</button>
-          <button class="tag" type="button" aria-pressed="false">Late meal</button>
-          <button class="tag" type="button" aria-pressed="false">No watch</button>
-          <button class="tag" type="button" aria-pressed="false">Travel</button>
-          <button class="tag" type="button" aria-pressed="false">Illness</button>
-        </div>
+        <div class="num" id="ciState" style="font-size:26px; line-height:1.15">—</div>
+        <div class="foot" id="ciWhy">Checking…</div>
       </div>
-      <button class="cta" type="button">Check in · about 25 seconds</button>
-      <div class="foot">
-      </div>
+      <div class="tags" id="ciTags"></div>
+      <a class="cta" id="ciCta" href="/ui/checkin">Check in</a>
+      <div class="foot" id="ciStreak"></div>
     </section>
 
     <!-- ───────── supplements ───────── -->
@@ -1432,6 +1416,43 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     });
   }
 
+  /* ── check-in card ──────────────────────────────────────────────────
+     Its own fetch rather than a field on /today, because the streak and
+     the prefill live on /checkin/status and the card wants the streak:
+     it is the only number on this screen that rewards a habit rather
+     than describing one. */
+  function renderCheckin(){
+    var t = token();
+    if (!t) return;
+    fetch('/api/v1/checkin/status', {headers:{Authorization:'Bearer ' + t}})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(s){
+        if (!s) return;
+        var done = !!s.submitted;
+        set('ciState', done ? (s.prefill ? s.prefill.overall_1_10 + '/10' : 'Done') : 'Not yet');
+        set('ciWhy', done
+          ? 'Logged for today. Tap to change it.'
+          : 'Readiness needs this one to clear its completeness floor.');
+        document.getElementById('ciCta').textContent = done ? 'Edit today' : 'Check in · one tap';
+
+        var tags = document.getElementById('ciTags');
+        tags.innerHTML = '';
+        ((s.prefill && s.prefill.tags) || []).forEach(function(name){
+          var b = document.createElement('span');
+          b.className = 'tag'; b.setAttribute('aria-pressed','true');
+          b.textContent = name.replace(/_/g, ' ');
+          tags.appendChild(b);
+        });
+
+        set('ciStreak', s.streak_days
+          ? (s.streak_days + ' day' + (s.streak_days === 1 ? '' : 's') + ' running · ' +
+             Math.round(s.completion_rate_30d) + '% of the last 30')
+          : 'No streak yet.');
+      })
+      .catch(function(){ set('ciWhy', 'Could not read the check-in status.'); });
+  }
+
   loadLive();   // the only view there is
+  renderCheckin();
 })();
 </script>

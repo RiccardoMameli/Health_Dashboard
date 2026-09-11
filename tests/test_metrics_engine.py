@@ -269,3 +269,65 @@ def test_brief_input_carries_no_time_series(session):
 
     # Tags and contributor lists are short by nature; a 30-day series is not.
     assert longest_list(payload) <= 5
+
+
+def test_this_mornings_checkin_counts_towards_this_morning(session):
+    """The check-in is taken within half an hour of waking (plan 7.1), so it
+    describes the morning it is filled in.
+
+    It was being read from `daytime`, a day late, which meant a check-in
+    submitted today could only ever count towards tomorrow — the one field
+    that carries completeness over its floor never moved the score on the day
+    it was answered. `/today` reported `checkin_submitted: true` and a
+    completeness that counted it missing, in the same response.
+    """
+    seed_history(session, days=30)
+    computed = compute_day(session, TODAY)
+    assert computed.checkin is not None
+    assert computed.checkin.date == TODAY
+    assert computed.present["checkin_overall"] is True
+
+
+def test_a_day_with_no_checkin_of_its_own_does_not_borrow_yesterdays(session):
+    """The mirror of the bug: yesterday's answer must not stand in for a
+    morning that was never checked in, or completeness reports a field the
+    day does not have."""
+    seed_history(session, days=30)
+    session.delete(session.get(Checkin, TODAY))
+    session.commit()
+
+    computed = compute_day(session, TODAY)
+    assert computed.checkin is None
+    assert computed.present["checkin_overall"] is False
+
+
+def test_the_checkin_alone_carries_samsung_over_the_completeness_floor(session):
+    """The arithmetic the form exists for. Samsung supplies four of the seven
+    expected fields, which is 57.1% against a 60% floor; the subjective answer
+    is the fifth and cheapest."""
+    day = TODAY
+    ensure_day(session, day)
+    end_at = datetime(day.year, day.month, day.day, 6, 0, tzinfo=UTC)
+    session.add(SleepSession(
+        date=day, start_at=end_at - timedelta(minutes=450), end_at=end_at,
+        duration_min=450, efficiency_pct=90.0,
+        source="samsung_health", source_record_id="s1"))
+    session.add(HeartMetric(date=day, resting_hr=52.0, source="samsung_health"))
+    # Steps belong to the daytime that acted on this morning, so yesterday's
+    # row is the one completeness counts.
+    ensure_day(session, day - timedelta(days=1))
+    session.add(ActivityDaily(date=day - timedelta(days=1), steps=9000,
+                              source="samsung_health"))
+    session.commit()
+
+    samsung_only = compute_day(session, day)
+    assert samsung_only.data_completeness_pct == pytest.approx(57.1, abs=0.1)
+    assert samsung_only.readiness.status == STATUS_INSUFFICIENT
+
+    session.add(Checkin(
+        date=day, submitted_at=end_at, overall_1_10=7, tags=[]))
+    session.commit()
+
+    with_checkin = compute_day(session, day)
+    assert with_checkin.data_completeness_pct == pytest.approx(71.4, abs=0.1)
+    assert with_checkin.readiness.status != STATUS_INSUFFICIENT

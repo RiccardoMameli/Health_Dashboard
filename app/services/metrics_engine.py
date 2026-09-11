@@ -436,7 +436,15 @@ def compute_day(session: Session, day: Date, settings: Settings | None = None) -
     out.protein_g_per_kg = protein_g_per_kg(out.protein_g, out.weight_ewma_kg)
 
     # ── subjective ───────────────────────────────────────────────────────
-    out.checkin = checkins.get(daytime)
+    # This morning's check-in, not yesterday's. Training and nutrition are
+    # read from `daytime` because yesterday is what acts on this morning, but
+    # the check-in is taken within half an hour of waking (plan 7.1) and
+    # describes the morning it is filled in. Reading it a day late meant a
+    # check-in submitted today could only ever count towards tomorrow, so the
+    # one field that carries completeness over its floor never moved the
+    # score on the day it was answered — while `/today` reported
+    # `checkin_submitted: true` for the same date in the same response.
+    out.checkin = checkins.get(overnight)
     overall_baseline = rolling_baseline(series(checkins, "overall_1_10", BASELINE_WINDOW_DAYS))
     out.subjective_z = z_score(
         out.checkin.overall_1_10 if out.checkin else None,
