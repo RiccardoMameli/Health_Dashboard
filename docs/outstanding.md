@@ -3,7 +3,7 @@
 Everything known to be needed and not done, with what actually unblocks each
 item. Kept separate from `build-log.md`, which records what *has* been built.
 
-**Last reviewed: 11 September 2026.**
+**Last reviewed: 11 September 2026** (Samsung export imported).
 
 Nothing here is forgotten work — it is deferred work, and the difference is
 that this file exists. Review it at the start of a working session.
@@ -33,13 +33,20 @@ deployed.
 | # | Item | Why deferred | What unblocks it |
 |---|---|---|---|
 | A1 | **Withings integration** | No developer credentials; OAuth2 flow needs a browser redirect | Register a personal app at developer.withings.com, put client id/secret in `.env`, complete the OAuth flow once |
-| A2 | ~~**Samsung Health export**~~ | No longer deferred. The export is taken and the parser is built (11 Sep) | **Run `scripts/import_samsung_export.py <zip> --dry-run` against the real 744 MB export, then without the flag.** The parser has only seen an export shaped like the real one |
+| A2 | ~~**Samsung Health export**~~ | **Done 11 Sep 2026.** 461 sleep sessions, 1,950 days of steps, 63 weight readings, 159 nights of resting HR, Feb 2021 to Sep 2026 | Nothing. Re-run the importer against a fresh export whenever more history is wanted; it is idempotent |
 | A3 | **Sleep ingestion, ongoing** | Needs the Phase 3 companion app; no cloud API exists (plan §3.3). History is covered by A2; the nightly feed is not | The Expo dev build. Until then sleep stops at the date of the last export |
 
 The Samsung parser deliberately leaves HRV, sleep stages as a series, stress,
 SpO2, skin temperature, respiratory rate, floors and Samsung's own exercise
 records unread. HRV is the one worth returning to: the values sit inside
-`binning_data` JSON blobs rather than a column.
+`binning_data` JSON blobs rather than a column. None of them is in
+`EXPECTED_DAILY_FIELDS`, so none of them moves completeness.
+
+Two things the real export taught that the fixtures could not: the sleep file
+stores UTC while the pedometer's `day_time` is local midnight, so a basis
+established on one file must not be assumed for another; and the pedometer
+carries about 2.7 rows per day, one per device that counted, so a day's step
+figure is a choice between them rather than a reading.
 
 **The adapters for A1 exist as live code and have never seen a real response.**
 That is exactly where the Hevy adapter was on the morning of 10 Sep, before
@@ -85,7 +92,7 @@ The Today screen came first for that reason.
 
 | # | Item | Phase | Notes |
 |---|---|---|---|
-| D1 | **Check-in form** | 1 | Listed in §14 Phase 1 and never built — the Phase 0/1 session was backend-only. The API exists; there is no way to actually use it daily. This is what C1 is waiting on. **Deferred 10 Sep 2026** in favour of getting an MVP UI up first: the form matters less until there is a screen to put it on and sleep data to give it context |
+| D1 | **Check-in form** | 1 | **Now the binding constraint on the whole score.** Samsung supplies 4 of the 7 completeness fields, which is 57.1% against a 60% floor — 2.9 points short, so a fully-measured night still reads `insufficient_data`. One subjective field typed by hand crosses it. Deferred on 10 Sep for want of a screen and sleep data; both now exist, and C1 cannot start until it does |
 | D2 | ~~Minimal Today screen~~ | 1 | **Done 10 Sep 2026.** `GET /ui` serves the Glacier reference from the backend with a "Live — my data" view reading `/api/v1/today`. Half the screen is still hand-written placeholder markup — the check-in card, supplements, source timestamps and header date — and says so in live mode |
 | D3 | Wire the remaining live tiles | 1–2 | Check-in state, supplement adherence and source timestamps are still design markup. Needs D1 and a data-health call. Sleep and RHR sparklines need a short series on `/today`, which is pointless until there is sleep data (A2/A3) |
 | D4 | Eval set for the brief (§9.4) | 2 | ~15 hand-picked days including a no-watch day and a missing-macros day |
