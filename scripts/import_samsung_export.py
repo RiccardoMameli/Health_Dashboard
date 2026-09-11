@@ -88,9 +88,19 @@ RAW_STREAMS: list[tuple[str, str, tuple[str, ...], str]] = [
 RAW_SKIPPED = "heart rate"
 
 
-def retain_raw(session, files: dict) -> int:
-    """Keep the source rows, so a wrong reading can be fixed without a re-export."""
-    kept = 0
+def retain_raw(session, files: dict) -> tuple[int, int]:
+    """Keep the source rows, so a wrong reading can be fixed without a re-export.
+
+    Rows are collapsed by key before anything is written. The pedometer file
+    carries several rows for one day — one per device that counted — so the
+    same key arrives more than once, and the session does not autoflush, which
+    means `store_raw`'s lookup cannot see a row queued a moment earlier. Two
+    inserts for one key then reach the database together and it rejects the
+    pair. Last row wins, which is what `store_raw` does for a key it has seen
+    before.
+    """
+    latest: dict[tuple[str, str], dict] = {}
+    duplicates = 0
     for stem, record_type, id_columns, prefix in RAW_STREAMS:
         raw = find(files, stem)
         if raw is None:
@@ -101,15 +111,20 @@ def retain_raw(session, files: dict) -> int:
             )
             if identifier is None:
                 continue
-            store_raw(
-                session,
-                source=SOURCE,
-                source_record_id=f"{prefix}{identifier}",
-                record_type=record_type,
-                payload=row,
-            )
-            kept += 1
-    return kept
+            key = (record_type, f"{prefix}{identifier}")
+            if key in latest:
+                duplicates += 1
+            latest[key] = row
+
+    for (record_type, source_record_id), row in latest.items():
+        store_raw(
+            session,
+            source=SOURCE,
+            source_record_id=source_record_id,
+            record_type=record_type,
+            payload=row,
+        )
+    return len(latest), duplicates
 
 
 def nights_with_resting_hr(sessions: list, samples: list) -> dict:
@@ -284,9 +299,12 @@ def main() -> int:
 
     with session_scope() as session:
         with sync_run(session, SOURCE) as run:
-            kept = retain_raw(session, files)
+            kept, duplicates = retain_raw(session, files)
             print(f"\n  retained {kept:,} source rows verbatim "
                   f"({RAW_SKIPPED} excepted — see RAW_SKIPPED)")
+            if duplicates:
+                print(f"  {duplicates:,} rows shared a key with another and were "
+                      f"collapsed to the last")
             written = 0
             for record in sessions:
                 day = sleep_day(record.end_at)
