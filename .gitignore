@@ -21,3 +21,10 @@ data/exports/
 # repo; they are meant to be read once and deleted.
 hevy-report*.txt
 metrics-report*.txt
+
+# Coverage artefacts. `.coverage` is a binary SQLite file written by
+# pytest-cov; it is a local measurement, not a source file.
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
