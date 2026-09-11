@@ -11,6 +11,7 @@ than a gap in the record.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping, Sequence
 from datetime import date as Date
 from statistics import stdev as _stdev
@@ -378,3 +379,36 @@ def volume_progression_slope(
     if denominator == 0:
         return None
     return sum((x - mean_x) * (y - mean_y) for x, y in points) / denominator
+
+
+#: Resting heart rate is not a field Samsung exports — only a stream of spot
+#: readings — so it has to be derived. A low percentile of the readings taken
+#: while asleep is the standard proxy: the minimum is one sensor artefact away
+#: from nonsense, and the mean is dominated by however much of the night the
+#: watch happened to sample.
+RESTING_HR_PERCENTILE = 5.0
+
+#: Below this many readings in a night, the percentile is describing noise.
+MIN_SAMPLES_FOR_RESTING_HR = 12
+
+
+def resting_hr_from_samples(
+    bpm: Sequence[float],
+    *,
+    percentile: float = RESTING_HR_PERCENTILE,
+    min_samples: int = MIN_SAMPLES_FOR_RESTING_HR,
+) -> float | None:
+    """Resting HR from the heart-rate readings taken during one sleep session.
+
+    None below `min_samples` — a night the watch barely sampled has no resting
+    heart rate, and returning the lowest of four readings would put a number in
+    the baseline that means nothing. The caller decides which readings belong
+    to the night; this only does the arithmetic.
+    """
+    values = sorted(v for v in bpm if v and v > 0)
+    if len(values) < min_samples:
+        return None
+    # Nearest-rank: no interpolation between two real measurements, so the
+    # result is always a reading that actually happened.
+    rank = max(1, math.ceil(percentile / 100 * len(values)))
+    return round(values[rank - 1], 1)

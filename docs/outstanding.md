@@ -3,7 +3,7 @@
 Everything known to be needed and not done, with what actually unblocks each
 item. Kept separate from `build-log.md`, which records what *has* been built.
 
-**Last reviewed: 10 September 2026.**
+**Last reviewed: 11 September 2026.**
 
 Nothing here is forgotten work — it is deferred work, and the difference is
 that this file exists. Review it at the start of a working session.
@@ -33,8 +33,13 @@ deployed.
 | # | Item | Why deferred | What unblocks it |
 |---|---|---|---|
 | A1 | **Withings integration** | No developer credentials; OAuth2 flow needs a browser redirect | Register a personal app at developer.withings.com, put client id/secret in `.env`, complete the OAuth flow once |
-| A2 | **Samsung Health export** | Deferred with the rest of the sleep work | Ten minutes in the Samsung Health app; the file does not expire. Gives potentially years of history |
-| A3 | **Sleep ingestion generally** | Needs the Phase 3 companion app; no cloud API exists (plan §3.3) | Either the export (A2) for history, or the Expo dev build for the ongoing feed |
+| A2 | ~~**Samsung Health export**~~ | No longer deferred. The export is taken and the parser is built (11 Sep) | **Run `scripts/import_samsung_export.py <zip> --dry-run` against the real 744 MB export, then without the flag.** The parser has only seen an export shaped like the real one |
+| A3 | **Sleep ingestion, ongoing** | Needs the Phase 3 companion app; no cloud API exists (plan §3.3). History is covered by A2; the nightly feed is not | The Expo dev build. Until then sleep stops at the date of the last export |
+
+The Samsung parser deliberately leaves HRV, sleep stages as a series, stress,
+SpO2, skin temperature, respiratory rate, floors and Samsung's own exercise
+records unread. HRV is the one worth returning to: the values sit inside
+`binning_data` JSON blobs rather than a column.
 
 **The adapters for A1 exist as live code and have never seen a real response.**
 That is exactly where the Hevy adapter was on the morning of 10 Sep, before

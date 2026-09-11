@@ -6,6 +6,85 @@ of each working session.
 
 ---
 
+## 11 September 2026 — the Samsung export, and proving the timezone
+
+The export is the only route to the four completeness fields readiness is
+starved of, so this session built the parser for it. The interesting part is
+not the parsing; it is that the parser **refuses to run until it has proved
+which clock the timestamps are on**. 184 tests passing.
+
+### The question that had to be settled before writing anything
+
+Samsung writes wall-clock times in one column and the UTC offset in another,
+and never says whether the clock reading is local or already-UTC. Both
+readings parse. Both produce a plausible dashboard. They differ by exactly one
+hour for the half of the year the offset is not zero, which is enough to move
+a night onto the wrong day, and they agree perfectly in winter — so the wrong
+choice is invisible for months and then quietly corrupts every sleep baseline.
+
+Inference pointed at local (`day_time` is exactly local midnight during BST),
+but inference is what silent failures are made of. `detect_timestamp_basis`
+settles it from the data instead: take the bedtimes, group them by offset,
+convert each way, and ask which reading leaves the seasonal groups agreeing.
+A human's bedtime does not jump an hour every March. Whichever reading makes
+it look like it did is the wrong one.
+
+Against the 555-night export shape, reading as local leaves a 0.02h seasonal
+gap and reading as UTC leaves 1.02h. The importer prints both numbers, uses
+the winner, and **returns 2 and writes nothing** when the data cannot settle
+it — one season only, too few nights, or bedtimes scattered enough that an
+hour is not distinguishable from noise. `--basis` overrides it for someone who
+has established the answer another way.
+
+### Five bugs, four of them silent
+
+The header line was the theme. Samsung puts a package-and-version line above
+the real header, so "the line with the most fields wins" picked the metadata
+line; agreement with the data rows below fixed that, until a three-column
+heart-rate file had a metadata line the *same width* as its header and parsed
+zero samples. Detecting the package-and-version shape explicitly fixed that,
+and then a `>=` tie-break let a data row outscore the header and sleep parsed
+zero rows. Each of these produced a parser that ran happily and returned
+nothing, or returned nonsense.
+
+The other two: a `width < 2` guard silently dropped single-column files, and
+the circular difference between 23:00 and 00:00 came out as 23 hours instead
+of 1, which would have rejected a perfectly good export as "scattered".
+
+### What it reads, and what it deliberately does not
+
+Sleep sessions, daily steps, weight with body composition, and heart-rate
+samples. Duration is computed from the two timestamps rather than read,
+because the pre-2024 records carry no duration field at all. Efficiency comes
+from `original_efficiency` and falls back to `efficiency` with **zero treated
+as absent** — the real export writes `efficiency = 0.0` on every pre-2024
+session, and storing that zero would put a fabricated 0% into a column the
+metrics engine reads as measured.
+
+Resting HR is not in the export. It is derived — `resting_hr_from_samples`
+takes the 5th percentile of the readings falling inside each sleep session,
+and returns None below twelve samples rather than a figure resting on three.
+
+Source rows are retained verbatim for sleep, steps and weight, per the raw
+retention rule. Heart-rate readings are the one knowing exception: three years
+of a worn watch is hundreds of thousands of rows, and resting HR is
+recomputable by re-running the importer against the export file. That is
+written down in `RAW_SKIPPED` rather than left as an omission someone finds
+later.
+
+Not ingested yet: HRV (values are buried in `binning_data` JSON blobs), sleep
+stages as a series, stress, SpO2, skin temperature, respiratory rate, floors,
+and Samsung's own exercise records.
+
+### Still unproven
+
+All of this has run against an export shaped like the real one, not the real
+744 MB export itself — that is the next thing, `--dry-run` first. And the
+timezone verdict is only as good as the export's own bedtime regularity; the
+refusal path exists because that is not guaranteed.
+
+---
+
 ## 10 September 2026 — the data reaches a screen
 
 The morning's session got real Hevy data in. This one put it in front of a
