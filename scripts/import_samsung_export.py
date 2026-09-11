@@ -24,6 +24,7 @@ import argparse
 import sys
 from collections import Counter
 from pathlib import Path
+from statistics import median
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -49,7 +50,10 @@ from app.adapters.samsung_export import (  # noqa: E402
     read_rows,
 )
 from app.db import session_scope  # noqa: E402
-from app.metrics.derived import resting_hr_from_samples  # noqa: E402
+from app.metrics.derived import (  # noqa: E402
+    MIN_SAMPLES_FOR_RESTING_HR,
+    resting_hr_from_samples,
+)
 from app.models import ActivityDaily, BodyMeasurement, HeartMetric, SleepSession  # noqa: E402
 from app.services.ingest import ensure_day, store_raw, sync_run, upsert  # noqa: E402
 from app.services.timeutil import sleep_day  # noqa: E402
@@ -106,6 +110,51 @@ def retain_raw(session, files: dict) -> int:
             )
             kept += 1
     return kept
+
+
+def nights_with_resting_hr(sessions: list, samples: list) -> dict:
+    """Resting HR per night: the low percentile of the readings taken inside
+    each sleep session (app.metrics.derived). Not exported by Samsung."""
+    samples = sorted(samples)
+    out: dict = {}
+    for session in sessions:
+        inside = [bpm for at, bpm in samples if session.start_at <= at <= session.end_at]
+        value = resting_hr_from_samples(inside)
+        if value is not None:
+            out[sleep_day(session.end_at)] = value
+    return out
+
+
+def heart_coverage(sessions: list, samples: list) -> tuple[int, int, float]:
+    """How much heart rate there actually is inside the sleep windows.
+
+    Resting HR comes out of these readings, so a low night count is worth
+    explaining before it is blamed on anything. It is usually the watch: the
+    reading is only taken while it is worn and the continuous mode is on.
+
+    Note what this does *not* do. Heart rate inherits the sleep file's basis,
+    which is an assumption — the export mixes conventions per file, the
+    pedometer's `day_time` being local while the sleep file is UTC. Trying to
+    settle it by overlap does not work, and an export built with sleep in UTC
+    and heart rate in local was measured to confirm that: a one-hour shift on
+    a seven-hour window leaves nearly every reading still inside it, so both
+    readings scored identically. The saving grace is that the same insensitivity
+    makes the assumption cheap — a fifth percentile over a whole night barely
+    moves when an hour of it is traded for an adjacent hour.
+    """
+    samples = sorted(samples)
+    per_night = [
+        sum(1 for at, _ in samples if session.start_at <= at <= session.end_at)
+        for session in sessions
+    ]
+    with_any = sum(1 for count in per_night if count)
+    usable = sum(1 for count in per_night if count >= MIN_SAMPLES_FOR_RESTING_HR)
+    counted = [c for c in per_night if c]
+    return with_any, usable, median(counted) if counted else 0.0
+
+
+def _other(basis: str) -> str:
+    return BASIS_UTC if basis == BASIS_LOCAL else BASIS_LOCAL
 
 
 def establish_basis(files: dict, override: str | None) -> str | None:
@@ -195,6 +244,18 @@ def main() -> int:
     days = parse_steps(steps_raw) if steps_raw else {}
     weight_raw = find(files, WEIGHT_FILE)
     weights = parse_weight(weight_raw, basis) if weight_raw else {}
+    # Weight inherits the sleep basis too, but there the question usually does
+    # not arise: an hour only changes a reading's date if the reading is
+    # within an hour of midnight. Rather than assume that, count them.
+    if weight_raw is not None:
+        other = parse_weight(weight_raw, _other(basis))
+        moved = sum(1 for day in set(weights) | set(other) if day not in weights
+                    or day not in other)
+        if moved:
+            print(f"  ! {moved} weight reading(s) change date under the other "
+                  f"reading of the timestamps — taken near midnight")
+        else:
+            print("  weight dates are the same under either reading")
     heart_raw = find(files, HEART_FILE)
     samples = parse_heart_samples(heart_raw, basis) if heart_raw else []
 
@@ -207,16 +268,15 @@ def main() -> int:
         print(f"  sleep spans {min(s.start_at for s in sessions).date()} "
               f"to {max(s.end_at for s in sessions).date()}")
 
-    # Resting HR is derived, not exported: the low percentile of the readings
-    # taken inside each sleep session (app.metrics.derived).
-    samples.sort()
-    resting: dict = {}
-    for session in sessions:
-        inside = [bpm for at, bpm in samples if session.start_at <= at <= session.end_at]
-        value = resting_hr_from_samples(inside)
-        if value is not None:
-            resting[sleep_day(session.end_at)] = value
+    resting = nights_with_resting_hr(sessions, samples)
     print(f"  {len(resting):>7,} nights with a derivable resting HR")
+    if sessions and samples:
+        with_any, usable, typical = heart_coverage(sessions, samples)
+        print(f"  {with_any:>7,} nights have any heart rate at all, "
+              f"{usable:,} have the {MIN_SAMPLES_FOR_RESTING_HR} a percentile needs")
+        print(f"  {typical:>7,.0f} readings on a typical night that has any")
+        print("          (the rest are nights the watch was not worn, or was worn")
+        print("           without continuous heart rate on — not a parser problem)")
 
     if args.dry_run:
         print("\nDry run: nothing written.")
