@@ -31,6 +31,7 @@ from __future__ import annotations
 import csv
 import re
 import zipfile
+from collections import Counter
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -66,6 +67,10 @@ HEADER_NAME_FRACTION = 0.8
 #: Below this a line is too short to judge by that fraction: one identifier in
 #: a one-cell line is 100% and means nothing.
 MIN_HEADER_CELLS = 2
+
+#: A daylight-saving step. The seasonal pair of offsets is the pair this far
+#: apart, which is what distinguishes it from a pair of travel offsets.
+DST_STEP_MINUTES = 60
 
 #: Records at the epoch are sentinels, not observations. The real export has
 #: one in the HRV file. Stored, it would sit in every baseline window forever.
@@ -226,6 +231,12 @@ def _circular_mean_hour(hours: list[float]) -> float:
     return mean(h + 24 if h < 12 else h for h in hours) % 24
 
 
+def format_offset(minutes: int) -> str:
+    """`60` back to `UTC+0100`, so a message names what the file contains."""
+    sign = "+" if minutes >= 0 else "-"
+    return f"UTC{sign}{abs(minutes) // 60:02d}{abs(minutes) % 60:02d}"
+
+
 def detect_timestamp_basis(
     samples: list[tuple[datetime, int | None]],
     *,
@@ -250,13 +261,33 @@ def detect_timestamp_basis(
     if not offsets:
         return BasisVerdict(None, 0.0, 0.0, 0, 0, "no usable offsets in the sample")
 
-    standard_offset = min(offsets)
-    daylight_offset = max(offsets)
-    if standard_offset == daylight_offset:
+    counts = Counter(offsets)
+    if len(counts) == 1:
         return BasisVerdict(
             None, 0.0, 0.0, len(offsets), 0,
             "every sample shares one offset, so the seasons cannot be compared",
         )
+
+    # The seasonal pair is the two offsets an hour apart that the most records
+    # sit in — not the extremes of the range. Taking min and max compared a
+    # holiday against a different holiday: on the real export it found six
+    # records at one end and three at the other and ignored several hundred
+    # GMT and BST nights in between. A trip does not tell you when someone
+    # goes to bed at home.
+    pairs = [
+        (counts[low] + counts[low + DST_STEP_MINUTES], low)
+        for low in counts
+        if low + DST_STEP_MINUTES in counts
+    ]
+    if pairs:
+        standard_offset = max(pairs)[1]
+        daylight_offset = standard_offset + DST_STEP_MINUTES
+    else:
+        # No pair an hour apart. Fall back to the two most populated offsets
+        # so an export from somewhere with a different rule still gets a
+        # verdict rather than a refusal it cannot act on.
+        common = sorted(o for o, _ in counts.most_common(2))
+        standard_offset, daylight_offset = common[0], common[1]
 
     def gap(basis: str) -> tuple[float, int, int]:
         groups: dict[int, list[float]] = {standard_offset: [], daylight_offset: []}
@@ -281,7 +312,8 @@ def detect_timestamp_basis(
         return BasisVerdict(
             None, local_gap, utc_gap, standard_n, daylight_n,
             f"need {min_per_group} samples either side of a daylight-saving "
-            f"change; have {standard_n} and {daylight_n}",
+            f"change; {format_offset(standard_offset)} has {standard_n} and "
+            f"{format_offset(daylight_offset)} has {daylight_n}",
         )
 
     if abs(local_gap - utc_gap) < decisive_hours:
