@@ -22,6 +22,7 @@ re-running after a later export is safe.
 
 import argparse
 import sys
+from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -37,6 +38,7 @@ from app.adapters.samsung_export import (  # noqa: E402
     WEIGHT_FILE,
     detect_timestamp_basis,
     find,
+    format_offset,
     load_export,
     parse_heart_samples,
     parse_naive,
@@ -141,6 +143,16 @@ def establish_basis(files: dict, override: str | None) -> str | None:
         print(f"    Columns present: {', '.join(sorted(rows[0])[:6])}...")
         print("    Run scripts/diagnose_samsung_sleep.py against the export.")
         return None
+
+    # Without this, a refusal names two counts and no reason for them. The
+    # real export refused on 6 against 3 because those were the extremes of a
+    # range that included holidays; seeing the whole distribution is what
+    # made that obvious.
+    spread = Counter(o for _, o in samples if o is not None)
+    print("  offsets present: "
+          + ", ".join(f"{format_offset(o)} x{n}" for o, n in spread.most_common(6)))
+    if len(spread) > 6:
+        print(f"  ({len(spread) - 6} rarer offsets not shown)")
 
     verdict = detect_timestamp_basis(samples)
 

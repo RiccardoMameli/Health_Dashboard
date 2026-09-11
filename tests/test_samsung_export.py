@@ -296,3 +296,34 @@ def test_a_data_row_of_values_is_never_mistaken_for_a_header():
         ],
     )
     assert list(read_rows(raw)[0]) == ["start_time", "time_offset", "efficiency"]
+
+
+def test_holidays_do_not_become_the_seasonal_pair():
+    """The real export refused because min(offsets) and max(offsets) were two
+    different holidays — six records against three — while several hundred GMT
+    and BST nights sat between them unused. The pair is the populated one."""
+    samples = []
+    for index in range(60):                       # winter, at home
+        samples.append((datetime(2024, 1, 1) + timedelta(days=index, hours=23), GMT))
+    for index in range(60):                       # summer, at home
+        samples.append((datetime(2024, 6, 1) + timedelta(days=index, hours=23), BST))
+    for index in range(6):                        # a week in New York
+        samples.append((datetime(2024, 3, 1) + timedelta(days=index, hours=23), -300))
+    for index in range(3):                        # a long weekend in Tokyo
+        samples.append((datetime(2024, 9, 1) + timedelta(days=index, hours=23), 540))
+
+    verdict = detect_timestamp_basis(samples)
+    assert verdict.basis == BASIS_LOCAL
+    assert verdict.standard_count == 60
+    assert verdict.daylight_count == 60
+
+
+def test_travel_alone_cannot_produce_a_verdict():
+    """Two holidays and nothing else is not a seasonal comparison. It has to
+    refuse rather than compare one trip against another."""
+    samples = [
+        (datetime(2024, 3, 1) + timedelta(days=i, hours=23), -300) for i in range(6)
+    ] + [
+        (datetime(2024, 9, 1) + timedelta(days=i, hours=23), 540) for i in range(3)
+    ]
+    assert detect_timestamp_basis(samples).basis is None
