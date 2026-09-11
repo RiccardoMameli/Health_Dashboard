@@ -6,6 +6,109 @@ of each working session.
 
 ---
 
+## 11 September 2026 (later) — the export goes in, and is wrong four times first
+
+The parser met the real export and four assumptions died. Every one of them
+would have produced a dashboard rather than an error. 198 tests passing.
+
+### The header is not the widest line, and never was
+
+The real sleep file has a **62-field header above 63-field data rows** — a
+trailing comma on every row. The rule in place, "the candidate line whose
+width the data rows agree with", therefore scored the header at zero and a
+data row at 460, elected the data row, and produced a table whose column
+names were `0`, `0.0`, `UTC+0000`, `VAbvgF796r` and a uuid. It parsed 460 rows
+and read none of them.
+
+That was the fourth width-based header rule to fail on this format, so width
+is gone. Column names are identifiers; values are numbers, timestamps,
+offsets and uuids. A line whose non-empty cells are 80% identifier-shaped is
+the header, and that distinction does not care whether the widths line up.
+
+### The timestamps are UTC, and the inference said local
+
+`day_time = '2021-05-04 00:00:00.000'` during BST established that the
+pedometer file is local midnight, and that got generalised to the export. It
+is wrong. The sleep file stores UTC: 0.14h residual against 0.86h, measured
+across the clock change. **The export mixes conventions per file**, which is
+the whole reason the check was built instead of the inference trusted.
+
+Two bugs stood between the check and that answer. The seasonal pair was taken
+as `min(offsets)` and `max(offsets)`, which on an export containing holidays
+compared a week at UTC-0500 against a long weekend at UTC+0900 — six records
+against three, with several hundred GMT and BST nights ignored in between. It
+now takes the two offsets an hour apart holding the most records, which is
+what a daylight-saving step is and a pair of holidays is not.
+
+Then the comparison itself moved from whole seasons to three weeks either
+side of a clock change. Bedtimes drift with the season by something
+approaching an hour — the size of the effect being measured — and the
+direction depends on the sleeper: later in summer biases towards `local`,
+earlier biases towards `utc`. Across six weeks the drift is minutes and the
+error is still the full hour, because one is gradual and the other is a step.
+
+### A check that could not do its job
+
+159 nights of resting HR out of 461 sleep sessions looked like heart rate
+might use a different basis again. A check was written to settle it by
+overlap, and then an export was built with sleep in UTC and heart rate in
+local to confirm the check worked. **It did not** — both readings scored 730
+of 730, because an hour's shift on a seven-hour window leaves nearly every
+reading inside it.
+
+It was deleted rather than shipped. A check that reports agreement on a file
+that demonstrably disagrees is worse than no check. The same insensitivity is
+what makes the inherited assumption cheap, and that reasoning is now written
+down where the next person will look. In its place the importer reports what
+is knowable: 449 nights have some heart rate, 162 have the twelve a
+percentile needs, and a typical night has nine. The watch, not the parser.
+
+### One day, several devices
+
+The import then crashed on a UNIQUE violation on `steps:2021-04-15`. The
+pedometer file carries **about 2.7 rows per day**, one per device that counted
+— 2,735 of 5,229 rows shared a key. The session does not autoflush, so
+`store_raw` could not see a row queued moments earlier and both reached the
+database together.
+
+The crash was the small half. `parse_steps` had been keeping whichever row
+came last, which is arbitrary: it can report a pocketed phone's 2,964 steps
+for a day the watch saw 11,402. That would never have thrown. The largest
+count now wins — the device that saw most of it — with the rest of the day's
+figures from the same row. Summing was rejected because it counts one walk
+once per device.
+
+### The bookkeeping could not record its own failure
+
+Underneath all of it, `sync_run` was broken in a way that matters beyond
+Samsung. A failed flush leaves the session refusing every further statement,
+so setting the run to `failed` and committing raised `PendingRollbackError`:
+the run stayed `running` and the original error was buried under a second
+traceback. **That is the silent ingestion failure the bookkeeping exists to
+prevent**, in code the Hevy adapter shares, and the invariant had no test.
+
+It now rolls back before recording, onto a run row committed before the work
+starts so it survives the rollback. A process killed mid-sync leaves a
+`running` row instead of no evidence. `tests/test_ingest.py` covers success,
+failure, a constraint violation and the rollback; the last two fail against
+the previous code, which was checked rather than assumed.
+
+### What it bought, and what it did not
+
+461 sleep sessions, 1,950 days of steps, 63 weight readings and 159 nights of
+resting HR, Feb 2021 to Sep 2026. Four of the seven completeness fields.
+
+**Four of seven is 57.1% against a 60% floor.** A fully-measured night still
+reads `insufficient_data`, 2.9 points short. Samsung's weight would be the
+fifth but `WEIGHT_FRESHNESS_DAYS = 1` and there are 63 readings across five
+years. So the binding constraint is now the check-in form — one subjective
+field, typed by hand, worth more to the score than any further integration.
+
+461 nights across 5½ years is roughly one night in four. That wear rate, not
+the parser, is what the baselines have to live with.
+
+---
+
 ## 11 September 2026 — the Samsung export, and proving the timezone
 
 The export is the only route to the four completeness fields readiness is

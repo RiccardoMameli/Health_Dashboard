@@ -27,20 +27,35 @@ readiness score have still only ever seen fixtures.
 recovery figure (plan §14.1 F1).
 
 The Samsung Health export parser (`app/adapters/samsung_export.py`,
-`scripts/import_samsung_export.py`) reads sleep, steps, weight and heart rate
-out of the export zip. It **proves whether the timestamps are local or UTC
-from the export's own bedtimes and refuses to write anything if the data
-cannot settle it** — the wrong reading is invisible in winter and moves every
-summer night onto the wrong day. It has run against an export shaped like the
-real one, not the real 744 MB export. 184 tests passing.
+`scripts/import_samsung_export.py`) is **verified against the real export and
+imported** (11 Sep 2026): 461 sleep sessions, 1,950 days of steps, 63 weight
+readings and 159 nights of derived resting HR, spanning Feb 2021 to Sep 2026.
+198 tests passing.
+
+It **proves whether the timestamps are local or UTC and refuses to write
+anything if the data cannot settle it.** The answer for the sleep file turned
+out to be UTC, against the inference that had been carried until then — the
+export mixes conventions per file, the pedometer's `day_time` being local
+midnight. The check is made across a daylight-saving change rather than
+across the seasons, because seasonal bedtime drift is the same size as the
+error being looked for.
 
 **Readiness needs 5 of 7 fields to clear the 60% floor, and Samsung Health
-supplies 4 of them.** Withings, MyFitnessPal and the check-in supply one each,
-so without the sleep stream the ceiling is 43% and the score reads
-`insufficient_data` no matter what else is connected. This is the constraint
-that decides what is worth building next; it is not a code problem. The export
-parser is the route to those four fields for *history*; the nightly feed still
-needs the Phase 3 companion app (outstanding A3).
+supplies 4 of them** — sleep duration, sleep efficiency, resting HR and steps.
+That is 57.1%, which is **2.9 points short**, so a day with a full night's
+Samsung data and nothing else still reads `insufficient_data`. Samsung's
+weight file would be the fifth, but `WEIGHT_FRESHNESS_DAYS = 1` means a
+reading only counts on the day it was taken, and there are 63 of them across
+five years.
+
+So the binding constraint is now **the check-in (D1, unbuilt)** — one
+subjective field, typed by hand, worth more to the score than any further
+integration. MyFitnessPal calories would do it too. This is the constraint
+that decides what is worth building next; it is not a code problem.
+
+The import covers *history*. The nightly feed still needs the Phase 3
+companion app (outstanding A3), so sleep stops at the date of the last
+export.
 
 Phase 2's *gate* is not met and cannot be met by writing code: it needs seven
 consecutive days of an accurate brief against real data. Same for Phase 1's
