@@ -52,6 +52,21 @@ OFFSET_RE = re.compile(r"^UTC([+-])(\d{2})(\d{2})$")
 #: heart-rate file is exactly that shape.
 METADATA_RE = re.compile(r"^[a-z][\w.]*\.[\w]+$", re.I)
 
+#: A column name: an identifier, optionally dotted. Data values are numbers,
+#: timestamps, `UTC+0000` and hyphenated uuids, none of which match.
+COLUMN_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)*$")
+
+#: How much of a line must read as column names before it is treated as the
+#: header. A real header scores 1.0. A data row scores near zero — the only
+#: values that can match are a package name or a bare alphanumeric token, and
+#: a row is not made of those. 0.8 leaves room for an export that puts a
+#: stray value in a header cell without letting a data row through.
+HEADER_NAME_FRACTION = 0.8
+
+#: Below this a line is too short to judge by that fraction: one identifier in
+#: a one-cell line is 100% and means nothing.
+MIN_HEADER_CELLS = 2
+
 #: Records at the epoch are sentinels, not observations. The real export has
 #: one in the HRV file. Stored, it would sit in every baseline window forever.
 EPOCH_CUTOFF = datetime(1990, 1, 1, tzinfo=UTC)
@@ -77,31 +92,50 @@ def read_rows(raw: bytes) -> list[dict[str, str]]:
     if not lines:
         return []
 
-    # The header is the candidate line whose field count the data rows agree
-    # with. "Most fields wins" was the first rule here and it is wrong: the
-    # metadata line has three fields, so it beats any header with fewer, and a
-    # short file would parse into nonsense that still looked like a table.
-    best_index, best_columns, best_agreement = 0, [], -1
+    # The header is identified by what it is made of, not by how many fields
+    # it has. Width-based rules have failed here three times, and the last
+    # one failed on the real export: its sleep header has 62 fields and every
+    # data row has 63, so "the width the data rows agree with" scored the
+    # header at zero, elected a data row, and produced a table whose column
+    # names were `0`, `UTC+0000` and a uuid. Nothing threw.
+    #
+    # Column names are identifiers. Values are numbers, timestamps, offsets
+    # and uuids. That difference does not depend on the widths lining up.
+    candidates: list[tuple[int, list[str]]] = []
     for index, line in enumerate(lines[:MAX_HEADER_SCAN]):
         fields = [f.strip() for f in next(csv.reader([line]), [])]
-        width = len(fields)
-        if not width:
+        if not fields:
             continue
         if (
-            width <= 3
+            len(fields) <= 3
             and METADATA_RE.match(fields[0] or "")
             and all(f.isdigit() for f in fields[1:] if f)
         ):
             continue                       # the package-and-version line
-        agreement = sum(
-            1 for row in csv.reader(lines[index + 1 : index + 40]) if len(row) == width
-        )
-        # Strictly greater, so the earliest qualifying line wins a tie. The
-        # data rows are themselves candidates and agree with each other just as
-        # well as the header does; preferring the later one picked a data row
-        # and lost the entire file.
-        if agreement > best_agreement:
-            best_index, best_columns, best_agreement = index, fields, agreement
+        candidates.append((index, fields))
+
+    best_index, best_columns = 0, []
+    for index, fields in candidates:
+        named = [f for f in fields if f]
+        if len(named) < MIN_HEADER_CELLS:
+            continue
+        looks_like_names = sum(1 for f in named if COLUMN_NAME_RE.match(f)) / len(named)
+        if looks_like_names >= HEADER_NAME_FRACTION:
+            best_index, best_columns = index, fields
+            break                          # the earliest such line is the header
+    else:
+        # No line reads as column names. Fall back to the old width rule
+        # rather than returning nothing, so an export shaped in a way this
+        # has not seen still parses instead of silently yielding zero rows.
+        best_agreement = -1
+        for index, fields in candidates:
+            agreement = sum(
+                1
+                for row in csv.reader(lines[index + 1 : index + 40])
+                if len(row) == len(fields)
+            )
+            if agreement > best_agreement:
+                best_index, best_columns, best_agreement = index, fields, agreement
     # Blank column names are dropped *after* zipping, never before. Removing
     # them from the header first shifts every later name onto the previous
     # column's value, which produces a dict with all the right keys and all

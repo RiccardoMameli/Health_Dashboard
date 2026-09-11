@@ -12,7 +12,9 @@ It reads only. It prints column names in full and truncates every data value,
 so the output is safe to paste back.
 """
 
+import csv
 import sys
+from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -67,6 +69,14 @@ def main() -> int:
     for index, line in enumerate(lines[:4]):
         print(f"  [{index}] {len(line.split(','))} fields | {clip(line)}")
 
+    # The header and the data rows do not have to be the same width, and on
+    # the real export they are not. Say so, because a left-anchored zip is
+    # only correct if the surplus field is at the end.
+    widths = Counter(len(r) for r in csv.reader(lines[1:60]))
+    print("\n=== field counts below line 0 ===")
+    for width, count in widths.most_common(4):
+        print(f"  {width} fields x{count}")
+
     rows = read_rows(raw)
     print(f"\n=== read_rows returned {len(rows):,} rows ===")
     if not rows:
@@ -88,6 +98,18 @@ def main() -> int:
         start, offset = row.get(START), row.get(OFFSET)
         print(f"  start={clip(start or '')!r:<46} -> {parse_naive(start)}")
         print(f"  offset={clip(offset or '')!r:<45} -> {parse_offset(offset)}")
+
+    # The real proof that the names line up with the values. A header one
+    # field narrower than its rows parses fine if the surplus is trailing and
+    # puts every value one column left if it is not, and the second case looks
+    # exactly like the first until something typed fails to parse.
+    readable = sum(1 for r in rows if parse_naive(r.get(START)) is not None)
+    print(f"\n=== {readable:,} of {len(rows):,} rows have a readable start_time ===")
+    if readable == 0:
+        print("-> the names do not line up with the values. The surplus field")
+        print("   is not at the end of the row.")
+    elif readable < len(rows):
+        print("-> some rows carry no start time, which is allowed.")
     return 0
 
 

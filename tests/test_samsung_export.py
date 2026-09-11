@@ -265,3 +265,34 @@ def test_a_blank_column_name_does_not_shift_the_ones_after_it():
             "com.samsung.health.sleep.end_time": "2024-01-29 06:31:00.000",
         }
     ]
+
+
+def test_the_header_wins_even_when_the_data_rows_are_wider():
+    """The real export's sleep header has 62 fields and every data row has 63.
+    Scoring candidates by the width the data rows agree with gave the header
+    zero and elected a data row, producing a table whose column names were
+    `0`, `UTC+0000` and a uuid — 460 rows, none of them readable."""
+    header = ["com.samsung.health.sleep.start_time", "com.samsung.health.sleep.time_offset"]
+    rows = [
+        ["2021-02-07 21:50:00.000", "UTC+0000", ""],   # one field wider
+        ["2021-02-09 22:04:00.000", "UTC+0000", ""],
+        ["2021-02-10 23:11:00.000", "UTC+0000", ""],
+    ]
+    parsed = read_rows(csv_bytes("com.samsung.shealth.sleep", header, rows))
+    assert len(parsed) == 3
+    assert parsed[0]["com.samsung.health.sleep.start_time"] == "2021-02-07 21:50:00.000"
+    assert parsed[0]["com.samsung.health.sleep.time_offset"] == "UTC+0000"
+
+
+def test_a_data_row_of_values_is_never_mistaken_for_a_header():
+    """Every value on the losing line is the kind the real export produced: a
+    zero, a timestamp, an offset, a token and a uuid."""
+    raw = csv_bytes(
+        "com.samsung.shealth.sleep",
+        ["start_time", "time_offset", "efficiency"],
+        [
+            ["2021-02-07 21:50:00.000", "UTC+0000", "0.0"],
+            ["f8553b66-d057-4fe4-be09-0aaed967a4dc", "UTC+0000", "0"],
+        ],
+    )
+    assert list(read_rows(raw)[0]) == ["start_time", "time_offset", "efficiency"]
