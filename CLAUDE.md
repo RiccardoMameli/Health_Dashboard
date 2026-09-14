@@ -30,7 +30,7 @@ The Samsung Health export parser (`app/adapters/samsung_export.py`,
 `scripts/import_samsung_export.py`) is **verified against the real export and
 imported** (11 Sep 2026): 461 sleep sessions, 1,950 days of steps, 63 weight
 readings and 159 nights of derived resting HR, spanning Feb 2021 to Sep 2026.
-198 tests passing.
+211 tests passing.
 
 It **proves whether the timestamps are local or UTC and refuses to write
 anything if the data cannot settle it.** The answer for the sleep file turned
@@ -40,18 +40,30 @@ midnight. The check is made across a daylight-saving change rather than
 across the seasons, because seasonal bedtime drift is the same size as the
 error being looked for.
 
-**Readiness needs 5 of 7 fields to clear the 60% floor, and Samsung Health
-supplies 4 of them** — sleep duration, sleep efficiency, resting HR and steps.
-That is 57.1%, which is **2.9 points short**, so a day with a full night's
-Samsung data and nothing else still reads `insufficient_data`. Samsung's
-weight file would be the fifth, but `WEIGHT_FRESHNESS_DAYS = 1` means a
-reading only counts on the day it was taken, and there are 63 of them across
-five years.
+The check-in form is built and live at `GET /ui/checkin` — one tap for a valid
+check-in, everything else optional.
 
-So the binding constraint is now **the check-in (D1, unbuilt)** — one
-subjective field, typed by hand, worth more to the score than any further
-integration. MyFitnessPal calories would do it too. This is the constraint
-that decides what is worth building next; it is not a code problem.
+**Readiness was reworked on 14 Sep 2026 and no longer matches plan 6.3's
+formula.** It is a weighted mean over the components that could be computed,
+not a sum of deductions from 100. The plan's formula gave a component with no
+data a contribution of zero, which is what a component sitting exactly on its
+baseline contributes — so the less the system knew, the better the day looked.
+A real morning scored 94 and green on five hours' sleep and a 3/10 self-rating.
+
+What follows from the mean: **coverage — the share of weight that could
+actually be evaluated — is now the gate, at 10%**, not field completeness.
+Completeness counts fields *recorded*; a recorded value with no baseline has
+no deviation to score, so a day could read 71% complete with nothing
+computable. The floor is deliberately low because the owner does not wear a
+watch every night and a dashboard that goes blank when he forgets is one that
+stops being opened. Every partial score carries its coverage and a sentence
+naming what it rests on.
+
+**Baselines prefer 30 days and widen to 90 when too sparse.** At his real wear
+rate (461 nights across 2,042 days) a fixed 30-day window produced a
+reportable sleep baseline on 2.8% of days; the adaptive one gives 69.9%. Same
+fourteen real observations, no interpolation — it just stops demanding they be
+recent, and reports the span it used.
 
 The import covers *history*. The nightly feed still needs the Phase 3
 companion app (outstanding A3), so sleep stops at the date of the last
@@ -82,9 +94,17 @@ size, may anything be stated as established. Enforce this in the prompt
 contract, not in the model's judgement.
 
 **Missing data is a first-class concept.** A null is a null, never a zero, and
-never an interpolation. If completeness is below 60%, emit `insufficient_data`
-rather than a score. Never explain a day the system cannot see. This will
-happen regularly — the watch is not worn every night, and that is expected.
+never an interpolation. Never explain a day the system cannot see, and never
+let a gap read as normality — silence and "exactly average" must not produce
+the same number. This will happen regularly: the watch is not worn every
+night, and that is expected.
+
+The gate is **coverage**, not completeness, and it is 10% (changed 14 Sep
+2026; the old rule was completeness below 60%). Below it emit
+`insufficient_data`; above it emit a score that states what it rests on. The
+change was made because the old floor measured fields recorded rather than
+components computable, and a day could pass it with nothing to compare against
+— which is how a five-hour night scored 94.
 
 **Sleep belongs to the day it ends**, in local time. Store UTC, render
 Europe/London. Tested against both 2026 BST/GMT transitions. The failure mode
@@ -137,6 +157,9 @@ this project dies (R7).
 
 ## Open items
 
+**`docs/comments-to-revisit.md` is the maybe pile** — things noticed and
+deliberately not acted on. Not commitments; deleting one is a fine outcome.
+
 **`docs/outstanding.md` is the full list** — what is deferred, what is blocked
 on a key, what is waiting on elapsed time, and what is simply unbuilt. Read it
 at the start of a session. Note that Withings is deferred as of 10 Sep 2026,
@@ -146,6 +169,10 @@ deliberately.
 
 - **O2**: MyFitnessPal does not sync macros. Decide before Phase 3 whether to
   switch to Cronometer or MacroFactor. `protein_g_per_kg` stays NULL until then.
+- **O5**: The long record (plan §14.1 F2) — coverage by month, weight against
+  training volume, sleep by weekday and season, resting HR over years, with an
+  export to hand to a GP. Wanted 14 Sep 2026. Reads only what is already
+  imported, so it is blocked on nothing but a decision to start.
 - **O4**: Per-muscle-group recovery view (plan §14.1 F1). Recorded, not
   scheduled — earliest Phase 4. Muscle groups are resolvable from Hevy's
   exercise templates using data already imported; steps and stairs need Phase

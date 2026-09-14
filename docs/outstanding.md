@@ -3,7 +3,10 @@
 Everything known to be needed and not done, with what actually unblocks each
 item. Kept separate from `build-log.md`, which records what *has* been built.
 
-**Last reviewed: 11 September 2026** (Samsung export imported).
+**Last reviewed: 14 September 2026** (readiness reworked).
+
+See also `comments-to-revisit.md` — the maybe pile, for things noticed and
+deliberately not acted on.
 
 Nothing here is forgotten work — it is deferred work, and the difference is
 that this file exists. Review it at the start of a working session.
@@ -115,6 +118,11 @@ The Today screen came first for that reason.
   switch to Cronometer or MacroFactor. `protein_g_per_kg` stays NULL until then.
 - **O4** — Per-muscle-group recovery view (plan §14.1 F1). Recorded, not
   scheduled; earliest Phase 4.
+- **O5** — The long record (plan §14.1 F2): coverage by month, weight against
+  training volume, sleep by weekday and season, resting HR over years, with an
+  export behind it. Wanted 14 Sep 2026 as something to interrogate and to hand
+  to a GP. Reads only what is already imported, so unlike everything else here
+  it is blocked on nothing but a decision to start.
 
 ---
 
