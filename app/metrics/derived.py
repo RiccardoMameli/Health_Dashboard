@@ -69,6 +69,31 @@ EXPECTED_DAILY_FIELDS = (
 #: Added to the expected set only once HRV is confirmed available (plan 3.3).
 HRV_FIELD = "hrv_ms"
 
+#: Where a self-rating sits when there is no personal baseline to compare it
+#: against, and how far from it counts as one standard deviation.
+#:
+#: Every other metric is meaningless in isolation — 450 minutes of sleep says
+#: nothing until you know his median — so all of them are withheld until a
+#: baseline exists. A 1-10 self-rating is the exception: the scale carries its
+#: own meaning, and a 3 is low by the scale's definition rather than by
+#: comparison. Without this, the field the owner can *always* supply counts
+#: for nothing for the first fortnight of checking in, which is the opposite
+#: of what the check-in is for.
+#:
+#: 7, not 5.5, because self-ratings skew high and an unremarkable day is
+#: usually reported as a seven. It is a prior, not a finding, and it is
+#: superseded the moment fourteen check-ins exist — at which point his own
+#: median replaces it and this constant stops being consulted.
+SUBJECTIVE_ANCHOR = 7.0
+SUBJECTIVE_ANCHOR_SD = 2.0
+
+
+def subjective_signal_without_baseline(overall_1_10: float | None) -> float | None:
+    """A self-rating scored against the scale itself, pending a real baseline."""
+    if overall_1_10 is None:
+        return None
+    return (overall_1_10 - SUBJECTIVE_ANCHOR) / SUBJECTIVE_ANCHOR_SD
+
 
 def sleep_debt(
     durations_min: Sequence[float | None],

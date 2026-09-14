@@ -1028,7 +1028,7 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
       track.setAttribute('stroke', 'var(--surface-2)');
       score.textContent = s.score;
       score.style.color = 'var(--ink)';
-      set('scoreUnit', 'of 100');
+      set('scoreUnit', s.scoreUnit || 'of 100');
     }
     $('statusBlock').className = 'st-' + s.status;
     set('statusGlyph', s.glyph);
@@ -1324,16 +1324,31 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     if (training.load_quality_note) caveats.push(training.load_quality_note);
     if (!d.checkin_submitted) caveats.push('No check-in submitted for today.');
 
+    /* The score is a mean over the components that could be computed, so the
+       coverage behind it decides what it is worth. It is shown next to the
+       number, never instead of it, and the note names what was and was not
+       measured — a 62 from sleep alone and a 62 from everything are not the
+       same 62, and the screen must not let them look alike. */
+    var coverage = readiness && readiness.coverage_pct != null
+      ? readiness.coverage_pct : null;
+
     return {
-      completeness: num(d.data_completeness_pct, 0) + '% complete',
+      completeness: (coverage === null
+        ? num(d.data_completeness_pct, 0) + '% complete'
+        : num(coverage, 0) + '% measured'),
       score: scored ? d.readiness : null,
       status: scored ? status : 'none',
       statusWord: scored ? status.charAt(0).toUpperCase() + status.slice(1) : 'No score',
       glyph: scored ? '!' : '—',
-      lede: scored
-        ? 'Live from /api/v1/today.'
-        : 'Data completeness is ' + num(d.data_completeness_pct, 0) +
-          '%, below the 60% floor. No readiness score for this morning.',
+      /* Coverage is carried by the header pill and spelled out in the lede.
+         It was tried under the number too and overflowed the gauge, clipping
+         "of 100 - 41% measured" to something that read as a second figure. */
+      scoreUnit: 'of 100',
+      lede: (readiness && readiness.note)
+        ? readiness.note
+        : (scored
+            ? 'Every component measured.'
+            : 'Nothing comparable was measured this morning, so no score is given.'),
       /* top_contributors is the ranked subset the design asks for, and the
          entries are {factor, impact} — not {name, points}. An empty array is
          truthy in JS, so it is normalised to null here: renderContributors
@@ -1432,7 +1447,7 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
         set('ciState', done ? (s.prefill ? s.prefill.overall_1_10 + '/10' : 'Done') : 'Not yet');
         set('ciWhy', done
           ? 'Logged for today. Tap to change it.'
-          : 'Readiness needs this one to clear its completeness floor.');
+          : 'The one reading you can always give, watch or no watch.');
         document.getElementById('ciCta').textContent = done ? 'Edit today' : 'Check in · one tap';
 
         var tags = document.getElementById('ciTags');

@@ -1,17 +1,43 @@
-"""The readiness score (plan 6.3).
+"""The readiness score.
 
-A 0-100 composite that is **always** reported with its component breakdown.
-Pure: weights come in as an argument so they can live in config rather than
-in code, and nothing here reads a database or a clock.
+A 0-100 composite that is **always** reported with its component breakdown
+and with how much of the picture it stands on. Pure: weights come in as an
+argument so they can live in config rather than in code, and nothing here
+reads a database or a clock.
+
+**The score is a weighted mean of the components that could be computed, not
+a sum of deductions from a perfect start.** That is a deliberate departure
+from plan 6.3's `readiness = 100 + ...`, made on 14 Sep 2026 because the
+plan's formula fails in the one way this project cannot tolerate: a component
+with no data contributed zero, which is arithmetically identical to a
+component sitting exactly on its baseline, so the less the system knew the
+better the day looked. A real morning — five hours' sleep, 71% efficiency,
+resting HR eight over, self-rated 3/10 — scored 94 and green, because no
+baseline was established and six of the seven components were silently
+treated as fine.
+
+The mean fixes that without the opposite error. Missing components leave the
+numerator *and* the denominator, so they neither flatter the score nor punish
+it: the answer becomes "as far as sleep can tell, this is a 62", and the
+coverage that answer rests on is reported next to it. Summing credits upward
+from zero was considered and does not work — with only sleep measured the
+attainable maximum would be sleep's share of the weight, so a perfect night
+would read 13/100. Rescaling by what is available is unavoidable, and once
+rescaled, counting up from zero and counting down from full are the same
+equation with the sign flipped.
 
 Three refusals are built in, and all three matter more than the number:
 
-- Below the completeness floor the score is not computed at all. The system
-  emits `insufficient_data` rather than scoring a day it cannot see.
-- A component with no input contributes nothing and is reported as
-  unavailable, never as a neutral zero dressed up as a measurement.
-- With HRV missing, its weight is redistributed and the confidence is marked
-  `reduced`, so a fallback score is never mistaken for a full one.
+- Below the *coverage* floor no score is computed. Coverage is the share of
+  weight that could actually be evaluated, which is the question that decides
+  whether a day is judgeable. Field completeness is reported alongside but no
+  longer gates the score: a field can be recorded and still contribute
+  nothing, because a value without an established baseline has no deviation
+  to score.
+- A component with no input is reported as unavailable and excluded from the
+  mean, never as a neutral zero dressed up as a measurement.
+- Confidence is derived from coverage, so a score resting on one component is
+  never presented like one resting on seven.
 """
 
 from __future__ import annotations
@@ -20,14 +46,46 @@ from dataclasses import dataclass, field
 
 from app.metrics.derived import SLEEP_DEBT_FULL_PENALTY_MIN, acwr_penalty
 
-#: The score the formula starts from (plan 6.3: `readiness = 100 + ...`).
-#: Note the consequence: at 100, every positive contribution is clipped, so an
-#: exceptional day and an ordinary one both read 100 and the score is purely a
-#: deduction scale. Lowering this to ~85 would give good days headroom at the
-#: cost of no longer matching the plan's formula. Left at the plan's value.
-BASELINE_SCORE = 100.0
+#: An ordinary day: every available component sitting exactly on its own
+#: baseline. Not 100, so that a genuinely good day has somewhere to go — under
+#: the old deduction-only scale an exceptional morning and an unremarkable one
+#: both read 100, which made the top of the range meaningless.
+NEUTRAL_SCORE = 75.0
 
-#: Below this, emit no score (plan 6.3).
+#: Points per unit of weighted-mean signal. Set so a day with every component
+#: at its worst lands near 5, which is where the old formula bottomed out:
+#: 75 - 45 x 1.557 = 5. Keeping the floor in the same place means historical
+#: scores stay roughly comparable even though the formula changed.
+SIGNAL_SPAN = 45.0
+
+#: Nights of observed sleep before an accumulated debt is worth scoring. One
+#: short night is a fact about one night, not a fortnight's debt.
+MIN_NIGHTS_FOR_SLEEP_DEBT = 3
+
+#: The window the debt ceiling is calibrated for.
+SLEEP_DEBT_WINDOW_NIGHTS = 14
+
+#: Coverage — the share of total weight that could actually be evaluated — is
+#: what gates the score. Below this, the day is not judgeable and no number is
+#: emitted.
+#:
+#: Deliberately low, and low on purpose rather than by accident. The owner
+#: does not wear a watch every night and has said plainly that a dashboard
+#: which goes blank whenever a night is missed is one that stops being opened.
+#: At 10% any single real component still produces a number — including a
+#: lone check-in, which at 11.5% of the weight is the thinnest basis that
+#: matters, and the one available on a morning when the watch stayed on the
+#: bedside table. Every such score carries its coverage and a sentence naming
+#: what it rests on, which is the honest trade: a thin answer that admits it
+#: is thin beats no answer. The refusal that survived scrutiny is the one
+#: this still makes — when nothing at all could be computed.
+MIN_COVERAGE_PCT = 10.0
+
+#: Field completeness is still computed and still reported — it answers "how
+#: much did the sources supply today", which is a real question. It no longer
+#: gates the score, because it answers the *wrong* question for that purpose:
+#: a recorded value with no established baseline has no deviation to score, so
+#: completeness can read 71% while nothing at all is computable.
 MIN_COMPLETENESS_PCT = 60.0
 
 #: Z-scores are clamped before weighting. Two SD, not three: past two, the
@@ -39,8 +97,16 @@ Z_CLAMP = 2.0
 
 #: Score bands for the readiness ring. Amber is deliberately wide — in the
 #: baseline phase the score is a prompt to look, not a verdict.
-GREEN_AT = 75.0
-AMBER_AT = 55.0
+#:
+#: Re-fitted when the formula became a mean, which is more sensitive around
+#: neutral than the old sum was: half an SD down on two metrics costs about
+#: seven points, where before it cost fifteen. With green starting at 70 an
+#: ordinary day sat five points above the boundary and flickered amber on
+#: trivial variation. At 65 a minor wobble stays green (68), one SD down on
+#: two metrics plus half the debt ceiling is amber (54), and two SD with a
+#: full debt ceiling is red (33).
+GREEN_AT = 65.0
+AMBER_AT = 40.0
 
 STATUS_GREEN = "green"
 STATUS_AMBER = "amber"
@@ -49,7 +115,13 @@ STATUS_INSUFFICIENT = "insufficient_data"
 
 CONFIDENCE_FULL = "full"
 CONFIDENCE_REDUCED = "reduced"
+CONFIDENCE_PARTIAL = "partial"
 CONFIDENCE_INSUFFICIENT = "insufficient"
+
+#: Coverage at or above this reads as a full picture; at or above the second,
+#: a reduced one. Below that it is partial and the note says so in words.
+FULL_COVERAGE_PCT = 80.0
+REDUCED_COVERAGE_PCT = 50.0
 
 
 @dataclass(frozen=True)
@@ -91,6 +163,14 @@ class ReadinessInput:
     rhr_deviation_z: float | None = None
     hrv_deviation_z: float | None = None
     sleep_debt_14d_min: float | None = None
+    #: How many nights the debt above was actually summed over. Required to
+    #: score it: a debt is a sum, so a fortnight with three observed nights
+    #: reports a smaller number than the same fortnight fully measured, and
+    #: scoring that against a fourteen-night ceiling rewards not measuring.
+    #: Zero nights produced a debt of 0.0, which is the "null became a zero"
+    #: failure the whole project is built to refuse — an empty database
+    #: scored 75 and green on the strength of it.
+    sleep_debt_nights: int | None = None
     acwr: float | None = None
     subjective_z: float | None = None
 
@@ -110,6 +190,10 @@ class Readiness:
     status: str
     confidence: str
     components: list[Component] = field(default_factory=list)
+    #: Share of the total weight that could actually be evaluated. This is the
+    #: number that says how much the score is worth, and it belongs next to
+    #: the score everywhere the score is shown.
+    coverage_pct: float = 0.0
     note: str | None = None
 
     def top_contributors(self, limit: int = 2) -> list[Component]:
@@ -127,6 +211,7 @@ class Readiness:
             "score": None if self.score is None else round(self.score, 1),
             "status": self.status,
             "confidence": self.confidence,
+            "coverage_pct": round(self.coverage_pct, 1),
             "note": self.note,
             "components": [
                 {"factor": c.factor, "impact": round(c.impact, 1), "available": c.available}
@@ -154,21 +239,35 @@ def _band(score: float) -> str:
     return STATUS_RED
 
 
-def _redistribute_hrv_weight(weights: ReadinessWeights) -> ReadinessWeights:
-    """Spread w4 across w1-w3 in proportion to their existing weights (6.3)."""
-    receivers = weights.sleep_duration + weights.sleep_efficiency + weights.rhr_deviation
-    if receivers <= 0 or weights.hrv_deviation <= 0:
-        return weights
-    scale = 1 + weights.hrv_deviation / receivers
-    return ReadinessWeights(
-        sleep_duration=weights.sleep_duration * scale,
-        sleep_efficiency=weights.sleep_efficiency * scale,
-        rhr_deviation=weights.rhr_deviation * scale,
-        hrv_deviation=0.0,
-        sleep_debt=weights.sleep_debt,
-        acwr=weights.acwr,
-        subjective=weights.subjective,
-    )
+# `_redistribute_hrv_weight` is gone. It existed to stop a missing HRV from
+# silently shrinking the score, by hand-spreading w4 across sleep and resting
+# HR. Taking a mean over the available weight does that for every component at
+# once, and does it proportionally rather than by a rule that only knew about
+# one of them.
+
+
+#: How each component reads in a sentence, for the note that explains what a
+#: partial score rests on. Named here so the wording is one edit, not seven.
+FACTOR_NAMES = {
+    "sleep_duration": "sleep length",
+    "sleep_efficiency": "sleep efficiency",
+    "rhr_deviation": "resting heart rate",
+    "hrv_deviation": "HRV",
+    "sleep_debt_14d": "sleep debt",
+    "acwr": "training load",
+    "subjective_yesterday": "how you rated the day",
+}
+
+
+def _phrase(factors: list[str], limit: int = 3) -> str:
+    """"sleep length, resting heart rate and 2 more"."""
+    names = [FACTOR_NAMES.get(f, f.replace("_", " ")) for f in factors]
+    if len(names) > limit:
+        head, rest = names[:limit], len(names) - limit
+        return ", ".join(head) + f" and {rest} more"
+    if len(names) > 1:
+        return ", ".join(names[:-1]) + " and " + names[-1]
+    return names[0] if names else "nothing"
 
 
 def compute_readiness(
@@ -176,75 +275,116 @@ def compute_readiness(
     weights: ReadinessWeights | None = None,
     *,
     sleep_debt_full_penalty_min: float = SLEEP_DEBT_FULL_PENALTY_MIN,
-    min_completeness_pct: float = MIN_COMPLETENESS_PCT,
-    baseline_score: float = BASELINE_SCORE,
+    min_coverage_pct: float = MIN_COVERAGE_PCT,
+    neutral_score: float = NEUTRAL_SCORE,
+    signal_span: float = SIGNAL_SPAN,
 ) -> Readiness:
-    """Score the day, or refuse to.
+    """Score the day over what could be measured, or refuse to.
 
-    Returns a `Readiness` whose score is None whenever the day is too sparse
-    to judge. Callers must render that refusal rather than substituting a
-    number of their own.
+    Returns a `Readiness` whose score is None whenever too little of the
+    picture was computable to judge. Callers must render that refusal rather
+    than substituting a number of their own.
     """
     weights = weights or ReadinessWeights()
 
-    if data.data_completeness_pct < min_completeness_pct:
+    #: (factor, weight, signal) — signal already signed so positive is better,
+    #: and None where the component could not be computed.
+    rhr_z = _clamped_z(data.rhr_deviation_z)
+
+    # A debt summed over part of a fortnight is compared against part of the
+    # ceiling, so three short nights out of three read as badly as fourteen
+    # out of fourteen rather than a fifth as badly. Below the minimum the
+    # debt is not scored at all and the component reports as unavailable.
+    nights = data.sleep_debt_nights
+    debt = data.sleep_debt_14d_min
+    debt_signal: float | None = None
+    if debt is not None and nights is not None and nights >= MIN_NIGHTS_FOR_SLEEP_DEBT:
+        observed_fraction = min(nights, SLEEP_DEBT_WINDOW_NIGHTS) / SLEEP_DEBT_WINDOW_NIGHTS
+        ceiling = sleep_debt_full_penalty_min * observed_fraction
+        debt_signal = -_clamp(debt / ceiling, 0.0, 1.0) if ceiling > 0 else None
+    terms: list[tuple[str, float, float | None]] = [
+        ("sleep_duration", weights.sleep_duration, _clamped_z(data.sleep_duration_z)),
+        ("sleep_efficiency", weights.sleep_efficiency, _clamped_z(data.sleep_efficiency_z)),
+        ("rhr_deviation", weights.rhr_deviation, None if rhr_z is None else -rhr_z),
+        ("hrv_deviation", weights.hrv_deviation, _clamped_z(data.hrv_deviation_z)),
+        ("sleep_debt_14d", weights.sleep_debt, debt_signal),
+        ("acwr", weights.acwr, None if data.acwr is None else -acwr_penalty(data.acwr)),
+        ("subjective_yesterday", weights.subjective, _clamped_z(data.subjective_z)),
+    ]
+
+    total_weight = sum(w for _, w, _ in terms)
+    available = [(f, w, s) for f, w, s in terms if s is not None]
+    available_weight = sum(w for _, w, _ in available)
+    coverage = 0.0 if total_weight <= 0 else available_weight / total_weight * 100.0
+
+    missing = [f for f, _, s in terms if s is None]
+    present = [f for f, _, s in available]
+
+    # `impact` stays in the same units the brief already quotes: the points
+    # this component moved the final score by. With the mean, that is its
+    # share of the available weight rather than its share of the whole.
+    components = [
+        Component(
+            factor=factor,
+            impact=(
+                0.0
+                if signal is None or available_weight <= 0
+                else signal_span * weight * signal / available_weight
+            ),
+            available=signal is not None,
+        )
+        for factor, weight, signal in terms
+    ]
+
+    if coverage < min_coverage_pct:
         return Readiness(
             score=None,
             status=STATUS_INSUFFICIENT,
             confidence=CONFIDENCE_INSUFFICIENT,
-            components=[],
+            components=components,
+            coverage_pct=coverage,
             note=(
-                f"Data completeness {data.data_completeness_pct:.0f}% is below the "
-                f"{min_completeness_pct:.0f}% floor. No score for this day."
+                "Nothing could be measured or compared against a baseline this "
+                "morning, so no score is given."
+                if not present
+                else (
+                    f"Only {_phrase(present)} could be measured, which is "
+                    f"{coverage:.0f}% of what the score weighs. Too little to "
+                    f"judge the morning, so no number is given."
+                )
             ),
         )
 
-    hrv_available = data.hrv_deviation_z is not None
-    effective = weights if hrv_available else _redistribute_hrv_weight(weights)
+    score = _clamp(neutral_score + sum(c.impact for c in components), 0.0, 100.0)
 
-    components: list[Component] = []
+    if coverage >= FULL_COVERAGE_PCT:
+        confidence = CONFIDENCE_FULL
+    elif coverage >= REDUCED_COVERAGE_PCT:
+        confidence = CONFIDENCE_REDUCED
+    else:
+        confidence = CONFIDENCE_PARTIAL
 
-    def add(factor: str, weight: float, signal: float | None) -> None:
-        """`signal` is already signed so that positive means better."""
-        components.append(
-            Component(
-                factor=factor,
-                impact=0.0 if signal is None else weight * signal,
-                available=signal is not None,
-            )
+    # HRV carries a seventh of the weight, so its absence alone still leaves
+    # coverage high enough to read as full. The plan calls the HRV-less
+    # formula a fallback and it should not present as the complete one, so
+    # its absence caps confidence regardless of what coverage says.
+    if data.hrv_deviation_z is None and confidence == CONFIDENCE_FULL:
+        confidence = CONFIDENCE_REDUCED
+
+    if missing:
+        note = (
+            f"Based on {_phrase(present)} — {coverage:.0f}% of the full picture. "
+            f"No reading for {_phrase(missing)}, so this is what today's data "
+            f"can say, not the whole story."
         )
+    else:
+        note = None
 
-    add("sleep_duration", effective.sleep_duration, _clamped_z(data.sleep_duration_z))
-    add("sleep_efficiency", effective.sleep_efficiency, _clamped_z(data.sleep_efficiency_z))
-
-    rhr_z = _clamped_z(data.rhr_deviation_z)
-    add("rhr_deviation", effective.rhr_deviation, None if rhr_z is None else -rhr_z)
-
-    hrv_z = _clamped_z(data.hrv_deviation_z)
-    add("hrv_deviation", effective.hrv_deviation, hrv_z)
-
-    debt = data.sleep_debt_14d_min
-    debt_signal = None if debt is None else -_clamp(debt / sleep_debt_full_penalty_min, 0.0, 1.0)
-    add("sleep_debt_14d", effective.sleep_debt, debt_signal)
-
-    acwr_signal = None if data.acwr is None else -acwr_penalty(data.acwr)
-    add("acwr", effective.acwr, acwr_signal)
-
-    add("subjective_yesterday", effective.subjective, _clamped_z(data.subjective_z))
-
-    raw = baseline_score + sum(c.impact for c in components)
-    score = _clamp(raw, 0.0, 100.0)
-
-    confidence = CONFIDENCE_FULL if hrv_available else CONFIDENCE_REDUCED
-    note = (
-        None
-        if hrv_available
-        else "HRV unavailable — its weight was redistributed across sleep and resting HR."
-    )
     return Readiness(
         score=score,
         status=_band(score),
         confidence=confidence,
         components=components,
+        coverage_pct=coverage,
         note=note,
     )
