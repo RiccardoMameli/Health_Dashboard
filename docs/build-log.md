@@ -6,6 +6,117 @@ of each working session.
 
 ---
 
+## 14 September 2026 — the score that was best when it knew least
+
+A review on the 11th went looking for improvements and found a bug instead:
+**a morning of five hours' sleep, 71% efficiency, resting HR eight over and a
+self-rating of 3/10 scored 94 out of 100, green.** Fixing it properly took the
+formula apart. 211 tests passing.
+
+### Why it scored 94
+
+Two faults, each harmless alone.
+
+`readiness = 100 + Σ(weight × signal)` is a deduction scale, so a component
+with no data contributed **zero** — which is exactly what a component sitting
+precisely on its baseline contributes. Silence and "perfectly normal" were the
+same number. An empty database scored 100.
+
+And the gate in front of it counted the wrong thing. Completeness asks how
+many fields were *recorded*; scoring needs to know how many components are
+*computable*. Those differ whenever a value has no baseline to deviate from,
+which at 23% overnight wear is most of the time. The day scored 71.4% complete
+with six of seven components silent.
+
+### What replaced it
+
+A weighted mean over the components that could be computed. Missing ones leave
+the numerator and the denominator, so they neither flatter nor punish, and the
+answer becomes "as far as sleep can tell, this is a 62" with the coverage
+printed beside it.
+
+The owner's instinct was to invert the scale — start at zero, add credit for
+each measurement. That does not work, and the reason is worth recording: with
+only sleep measured the attainable maximum would be sleep's share of the
+weight, so a perfect night would read 13/100. Rescaling by what is available
+is unavoidable, and **once rescaled, counting up from zero and counting down
+from full are the same equation with the sign flipped.** There was no choice
+to make, only an arithmetic identity to notice.
+
+Coverage is now the gate, at 10%. Deliberately low, for a stated reason: he
+does not wear a watch to bed and said plainly that a dashboard which goes
+blank when he forgets is one that stops being opened. A lone check-in is 11.5%
+of the weight and scores, marked `partial`, carrying a sentence naming what it
+rests on. The only refusal left is the one that survives scrutiny — nothing
+computable at all.
+
+    A. Watch left on the bedside table, tapped 7/10   52.0  amber   30% measured
+    B. Same morning, rated 3/10                       58.4  amber   41% measured
+    C. Bad night measured: 5h, 71%, RHR 64, 3/10       3.0  red     74% measured
+    D. Good night: 7h40, 91%, RHR 52, 8/10            87.7  green   74% measured
+
+C and D carry identical coverage and 85 points of difference. The old scale
+put both above 90.
+
+### Three faults found while testing the fix
+
+**Sleep debt was scored from zero observed nights.** `sleep_debt` honestly
+returns `(0.0, 0)` and names the count; the caller threw the count away, so
+"no debt" and "no nights" were the same number. That single null-turned-zero
+is what let an empty database score at all. It now needs three nights, and a
+partial fortnight is measured against a proportional ceiling — three short
+nights out of three read as badly as fourteen out of fourteen, rather than a
+fifth as badly, which had been quietly rewarding not measuring.
+
+**Baselines assumed a watch worn most nights.** Fourteen observations inside
+thirty days needs 47% wear sustained across the window. Measured against his
+real history — 461 nights across 2,042 days — that produced a reportable sleep
+baseline on **2.8% of days**. Five and a half years imported, almost none of it
+usable. Preferring thirty days and widening to ninety only when necessary
+takes it to **69.9%**: the same fourteen real observations, no interpolation,
+simply no longer also demanding they be recent. The cost is reported rather
+than hidden — `span_days` says how far back they reach, a median of 62.
+
+**The self-rating counted for nothing for a fortnight.** The field he is asked
+for every single morning, and the one the check-in form was built for three
+days earlier, contributed zero until fourteen check-ins existed. A 1-10 rating
+is the one metric that means something in isolation — a 3 is low by the
+scale's own definition, not by comparison — so it now falls back to the
+scale's anchor, is flagged as anchored, and is superseded the moment his own
+median exists. The anchor of 7 is a prior and is written down as one.
+
+### What this cost elsewhere
+
+The bands moved: a mean is more sensitive around neutral than a sum, so half
+an SD down on two metrics costs seven points where it used to cost fifteen,
+and green starting at 70 left an ordinary day flickering on the boundary.
+Green now starts at 65.
+
+`_redistribute_hrv_weight` is gone. It hand-spread HRV's weight across sleep
+and resting HR so a missing HRV would not shrink the score; the mean does that
+for every component at once, and proportionally rather than by a rule that
+knew about one of them. HRV's absence still caps confidence at `reduced`,
+because the plan calls that formula a fallback and it should not present as
+the complete one.
+
+### Recorded, not built
+
+`docs/comments-to-revisit.md` now exists for things noticed and deliberately
+skipped — the import's 61M-comparison hot loop, `no_watch` being collected and
+never used, `WEIGHT_FRESHNESS_DAYS = 1`, sleep going stale between exports.
+The maybe pile, kept separate from `outstanding.md`, which is work that is
+going to happen.
+
+And **F2, the long record**, is in the plan at §14.1: coverage by month,
+weight against training volume, sleep by weekday and season, resting HR over
+years, with an export behind it to hand to a GP. The argument for it is that
+the sparser the daily data, the more the value sits in the long view — a
+five-year weight trend does not care which particular nights are missing.
+Deferred, with the note that unlike everything else in that section it needs
+no new integration, no device and no elapsed time.
+
+---
+
 ## 11 September 2026 (later) — the export goes in, and is wrong four times first
 
 The parser met the real export and four assumptions died. Every one of them

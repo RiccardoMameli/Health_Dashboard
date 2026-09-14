@@ -16,6 +16,7 @@ from app.ai.prompts import PHASE_CLAUSES, PROMPT_VERSION, system_prompt
 from app.ai.schemas import BriefOutput
 from app.ai.verify import untraceable_numbers
 from app.config import Settings
+from app.metrics.readiness import NEUTRAL_SCORE
 from app.services import brief as brief_service
 from app.services.email import EmailDeliveryError, render_html, send_brief
 from tests.test_metrics_engine import TODAY, seed_history
@@ -322,7 +323,7 @@ def test_metrics_endpoint_exposes_the_breakdown(session, client, auth):
 
     assert response.status_code == 200
     body = response.json()
-    assert body["readiness"]["score"] == 100.0
+    assert body["readiness"]["score"] == NEUTRAL_SCORE
     assert len(body["readiness"]["components"]) == 7
     assert body["completeness"]["fields"]["sleep_duration_min"] is True
     assert body["sleep"]["baseline_n"] == 30

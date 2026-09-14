@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
 from app.metrics.baselines import (
-    BASELINE_WINDOW_DAYS,
+    BASELINE_MAX_WINDOW_DAYS,
     STATUS_POTENTIALLY_BIASED,
     Baseline,
     deviation,
@@ -51,6 +51,7 @@ from app.metrics.derived import (
     session_load_and_basis,
     sleep_debt,
     sleep_midpoint_variance,
+    subjective_signal_without_baseline,
     weight_ewma_series,
     weight_trend_kg_per_week,
 )
@@ -274,6 +275,9 @@ class ComputedDay:
     sleep_efficiency_baseline: Baseline | None = None
     sleep_debt_14d_min: float | None = None
     sleep_debt_nights: int = 0
+    #: True when `subjective_z` came from the 1-10 scale's own anchor rather
+    #: than from his median, because fewer than fourteen check-ins exist.
+    subjective_anchored: bool = False
     sleep_midpoint_variance_min: float | None = None
 
     resting_hr: float | None = None
@@ -326,7 +330,10 @@ def compute_day(session: Session, day: Date, settings: Settings | None = None) -
     overnight = day
     daytime = day - timedelta(days=1)
 
-    window_start = day - timedelta(days=BASELINE_WINDOW_DAYS - 1)
+    # The widest a baseline may reach. `rolling_baseline` still prefers the
+    # last 30 days and only widens when they are too sparse, so this is a
+    # ceiling on how far back it may look, not the window it uses.
+    window_start = day - timedelta(days=BASELINE_MAX_WINDOW_DAYS - 1)
     excluded = _excluded_dates(session, window_start, day)
 
     nights = _nights(session, window_start, day)
@@ -338,7 +345,12 @@ def compute_day(session: Session, day: Date, settings: Settings | None = None) -
         start = day - timedelta(days=days - 1)
         out: list[float | None] = []
         for d in _dates(start, day):
+            # An excluded day contributes no observation, but it still takes
+            # up its slot: the series is one entry per calendar day so that
+            # position means date, which is what lets a baseline report how
+            # far back its observations actually reach.
             if d in excluded:
+                out.append(None)
                 continue
             row = source.get(d)
             out.append(None if row is None else getattr(row, attr))
@@ -354,10 +366,10 @@ def compute_day(session: Session, day: Date, settings: Settings | None = None) -
         out.sleep_deep_min = tonight.deep_min
         out.sleep_rem_min = tonight.rem_min
 
-    durations = series(nights, "duration_min", BASELINE_WINDOW_DAYS)
+    durations = series(nights, "duration_min", BASELINE_MAX_WINDOW_DAYS)
     out.sleep_baseline = sleep_baseline(durations)
     out.sleep_efficiency_baseline = rolling_baseline(
-        series(nights, "efficiency_pct", BASELINE_WINDOW_DAYS)
+        series(nights, "efficiency_pct", BASELINE_MAX_WINDOW_DAYS)
     )
 
     debt_window = series(nights, "duration_min", DEBT_WINDOW_DAYS)
@@ -377,8 +389,8 @@ def compute_day(session: Session, day: Date, settings: Settings | None = None) -
     out.resting_hr = heart_today.resting_hr if heart_today else None
     out.hrv_ms = heart_today.hrv_rmssd_ms if heart_today else None
 
-    out.rhr_baseline = rolling_baseline(series(hearts, "resting_hr", BASELINE_WINDOW_DAYS))
-    out.hrv_baseline = rolling_baseline(series(hearts, "hrv_rmssd_ms", BASELINE_WINDOW_DAYS))
+    out.rhr_baseline = rolling_baseline(series(hearts, "resting_hr", BASELINE_MAX_WINDOW_DAYS))
+    out.hrv_baseline = rolling_baseline(series(hearts, "hrv_rmssd_ms", BASELINE_MAX_WINDOW_DAYS))
     out.rhr_deviation_bpm = deviation(out.resting_hr, out.rhr_baseline)
     out.hrv_deviation_pct = relative_deviation(out.hrv_ms, out.hrv_baseline)
 
@@ -445,12 +457,21 @@ def compute_day(session: Session, day: Date, settings: Settings | None = None) -
     # score on the day it was answered — while `/today` reported
     # `checkin_submitted: true` for the same date in the same response.
     out.checkin = checkins.get(overnight)
-    overall_baseline = rolling_baseline(series(checkins, "overall_1_10", BASELINE_WINDOW_DAYS))
+    overall_baseline = rolling_baseline(series(checkins, "overall_1_10", BASELINE_MAX_WINDOW_DAYS))
     out.subjective_z = z_score(
         out.checkin.overall_1_10 if out.checkin else None,
         overall_baseline,
         sd_floor=SD_FLOORS["subjective_overall"],
     )
+    # Until fourteen check-ins exist there is no personal baseline, and
+    # without this the answer he is asked for every morning counts for
+    # nothing for a fortnight. A 1-10 rating is the one metric that means
+    # something on its own, so it falls back to the scale's own anchor and is
+    # marked as doing so. His own median takes over the moment it exists.
+    out.subjective_anchored = False
+    if out.subjective_z is None and out.checkin is not None:
+        out.subjective_z = subjective_signal_without_baseline(out.checkin.overall_1_10)
+        out.subjective_anchored = out.subjective_z is not None
 
     # ── completeness and readiness ───────────────────────────────────────
     fresh_weight = any((day - d).days <= WEIGHT_FRESHNESS_DAYS for d, _ in weights)
@@ -487,6 +508,7 @@ def compute_day(session: Session, day: Date, settings: Settings | None = None) -
             ),
             hrv_deviation_z=z_score(out.hrv_ms, out.hrv_baseline, sd_floor=SD_FLOORS["hrv_ms"]),
             sleep_debt_14d_min=out.sleep_debt_14d_min,
+            sleep_debt_nights=out.sleep_debt_nights,
             acwr=out.acwr,
             subjective_z=out.subjective_z,
         ),

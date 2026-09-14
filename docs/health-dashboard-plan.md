@@ -900,6 +900,61 @@ belongs with the experiment engine, not before it.
 gated on Phase 3, and the calibrated version on Phase 5. Not to be started
 while Phase 1's and Phase 2's gates are open.
 
+#### F2 — The long record (raised 14 Sep 2026)
+
+A screen, and an export behind it, that answers *"what does my data say about
+me over years"* rather than *"how am I this morning"*. Coverage by month and by
+stream; weight against training volume; sleep by weekday and by season;
+resting HR over years. A record to interrogate, and one that can be handed to
+a GP or read by a model without either of them having to trust a dashboard
+they cannot see.
+
+**Why it is worth building.** Two reasons, and the second is the stronger.
+
+The first is that the data is already there and nothing else looks at it. The
+Samsung import brought in 461 nights, 1,950 days of steps, 63 weight readings
+and 159 nights of derived resting HR spanning February 2021 to September 2026,
+sitting alongside 274 Hevy workouts. Every screen built so far answers a
+question about *today*. Five and a half years of history is currently write-only.
+
+The second is that the daily score cannot carry this project on its own. At
+23% overnight wear a readiness number is a partial answer most mornings, and
+honestly labelled as one. A retrospective view does not care about that at
+all: a five-year weight trend or a weekday/weekend sleep split is unaffected
+by which particular nights are missing, because it is asking about the shape
+of a distribution rather than the state of a morning. **The sparser the daily
+data, the more the long record is where the value actually is.**
+
+**What it must not become.** A correlation browser. Five years of daily data
+across a dozen streams will produce statistically significant nonsense on
+demand, and the phase-locked language rules (§9.2) exist precisely because a
+confident causal sentence is the easiest thing in the world to generate and
+the hardest to detect as wrong. The rules apply here unchanged: in `baseline`
+and `associative` this screen describes shape and reports sample sizes, and
+says nothing about cause.
+
+**Design constraints, inherited:**
+
+- **Gaps are drawn as gaps** (§10.3). A month with four measured nights is
+  drawn as four measured nights, never smoothed into a line that implies
+  thirty. Every aggregate carries its n.
+- **The coverage view comes first**, not last. Before showing what the data
+  says, show how much data there is — by month, by stream. It is the honest
+  frame for everything below it and it is also the most useful single view
+  for deciding what to fix next.
+- **Arithmetic in tested code, as everywhere else.** Any narration over this
+  is the AI layer reading a pre-computed summary. Never a time series to a
+  model.
+- **Exportable.** The point of a record you can hand to someone is that you
+  can hand it to them: a self-contained file, human-readable, no dashboard
+  required to make sense of it.
+
+**Earliest sensible phase: 4**, alongside the other screens — but it is the
+one item in this section with a case for arriving *earlier*, because it needs
+no new integration, no new device and no elapsed time. It reads what has
+already been imported. Recorded as deferred, with that argument noted rather
+than acted on.
+
 ---
 
 ## 15. Risks
@@ -930,6 +985,7 @@ while Phase 1's and Phase 2's gates are open.
 | O2 | MyFitnessPal: stay, switch, or Premium monthly import (§3.4) | Phase 3 | **Provisionally: stay on MFP, calories only. Revisit.** |
 | O3 | Sleep target for sleep-debt calculation | Phase 2 | **Resolved 3 Sep 2026: 7h30** |
 | O4 | Per-muscle-group recovery view (§14.1 F1) | Phase 4 | **Recorded 10 Sep 2026, not scheduled.** Muscle groups resolvable from Hevy templates today; steps/stairs need Phase 3; the per-muscle percentage needs check-in soreness and Phase 5 to be honest. |
+| O5 | The long record (§14.1 F2) | Phase 4 | **Recorded 14 Sep 2026, not scheduled.** Wanted by the owner as a history to interrogate and to share with a GP. Needs no new integration, device or elapsed time — it reads the 5½ years already imported — so it has a case for arriving earlier than its phase. |
 
 ---
 

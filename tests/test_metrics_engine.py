@@ -9,7 +9,11 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 
 from app.metrics.baselines import STATUS_ESTABLISHING, STATUS_OK
-from app.metrics.readiness import STATUS_INSUFFICIENT
+from app.metrics.readiness import (
+    NEUTRAL_SCORE,
+    STATUS_INSUFFICIENT,
+    ReadinessWeights,
+)
 from app.models import (
     ActivityDaily,
     BodyMeasurement,
@@ -23,6 +27,18 @@ from app.models import (
 )
 from app.services.ingest import ensure_day
 from app.services.metrics_engine import build_brief_input, compute_day, persist
+
+#: HRV's share of the total weight. It is the only component this device
+#: cannot supply, so a fully measured day covers everything but that.
+_W = ReadinessWeights()
+HRV_SHARE_PCT = (
+    _W.hrv_deviation
+    / (
+        _W.sleep_duration + _W.sleep_efficiency + _W.rhr_deviation + _W.hrv_deviation
+        + _W.sleep_debt + _W.acwr + _W.subjective
+    )
+    * 100
+)
 
 TODAY = date(2026, 9, 4)
 
@@ -81,7 +97,15 @@ def test_a_complete_month_produces_a_score(session):
     assert out.sleep_baseline.median == 450.0
     assert out.rhr_baseline.median == 52.0
     assert out.data_completeness_pct == pytest.approx(100.0)
-    assert out.readiness.score == pytest.approx(100.0)
+    # NEUTRAL_SCORE, not 100: an ordinary day leaves headroom above it now
+    # that the score is a mean rather than a deduction from perfect.
+    assert out.readiness.score == pytest.approx(NEUTRAL_SCORE)
+    # Everything this fixture can supply was supplied. What is missing is
+    # missing for a reason the test names, rather than being asserted as a
+    # number that would silently absorb a future gap.
+    unavailable = {c.factor for c in out.readiness.components if not c.available}
+    assert unavailable == {"hrv_deviation", "acwr"}  # no HRV device, no workouts
+    assert out.readiness.coverage_pct > 70.0
     assert out.readiness.confidence == "reduced"  # no HRV on this device
 
 
@@ -92,7 +116,7 @@ def test_sleeping_under_target_accrues_debt_and_costs_readiness(session):
 
     assert out.sleep_debt_14d_min == pytest.approx(280.0)
     assert out.sleep_debt_nights == 14
-    assert out.readiness.score < 100
+    assert out.readiness.score < NEUTRAL_SCORE
     assert out.readiness.top_contributors()[0].factor == "sleep_debt_14d"
 
 
@@ -118,16 +142,23 @@ def test_sleep_is_attributed_to_the_day_it_ends(session):
     assert out.sleep_duration_min == 400
 
 
-def test_a_sparse_day_gets_no_score(session):
-    """Never explain a day the system cannot see."""
+def test_a_day_with_nothing_comparable_gets_no_score(session):
+    """Never explain a day the system cannot see.
+
+    One resting-HR reading with no history behind it has no baseline, so
+    there is nothing to deviate from and nothing to score. Note what is
+    *not* asserted here any more: field completeness. A recorded value with
+    no baseline contributes nothing regardless of how complete the day looks,
+    which is why coverage replaced completeness as the gate.
+    """
     ensure_day(session, TODAY)
     session.add(HeartMetric(date=TODAY, resting_hr=52.0, source="samsung_health"))
     session.commit()
 
     out = compute_day(session, TODAY)
-    assert out.data_completeness_pct < 60
     assert out.readiness.score is None
     assert out.readiness.status == STATUS_INSUFFICIENT
+    assert out.readiness.coverage_pct == 0.0
 
 
 def test_a_missing_night_is_a_gap_not_a_zero(session):
@@ -223,7 +254,7 @@ def test_persist_is_idempotent(session):
 
     rows = session.query(DailyMetrics).all()
     assert len(rows) == 1
-    assert rows[0].readiness_score == pytest.approx(100.0)
+    assert rows[0].readiness_score == pytest.approx(NEUTRAL_SCORE)
     assert rows[0].readiness_components["top_contributors"] == []
 
 
@@ -301,10 +332,16 @@ def test_a_day_with_no_checkin_of_its_own_does_not_borrow_yesterdays(session):
     assert computed.present["checkin_overall"] is False
 
 
-def test_the_checkin_alone_carries_samsung_over_the_completeness_floor(session):
-    """The arithmetic the form exists for. Samsung supplies four of the seven
-    expected fields, which is 57.1% against a 60% floor; the subjective answer
-    is the fifth and cheapest."""
+def test_the_checkin_adds_a_component_the_wearables_cannot(session):
+    """The check-in earns its place by covering ground nothing else reaches.
+
+    This used to assert the 57.1% -> 71.4% step across the completeness floor.
+    That floor no longer gates the score, because completeness counts fields
+    recorded rather than components computable and a day could read 71%
+    complete with nothing at all comparable. What the check-in actually buys
+    is a component — and on a morning with no history behind it, it is the
+    only one there is.
+    """
     day = TODAY
     ensure_day(session, day)
     end_at = datetime(day.year, day.month, day.day, 6, 0, tzinfo=UTC)
@@ -322,12 +359,15 @@ def test_the_checkin_alone_carries_samsung_over_the_completeness_floor(session):
 
     samsung_only = compute_day(session, day)
     assert samsung_only.data_completeness_pct == pytest.approx(57.1, abs=0.1)
+    # Four fields recorded, and still nothing to compare them against.
     assert samsung_only.readiness.status == STATUS_INSUFFICIENT
+    assert samsung_only.readiness.coverage_pct == 0.0
 
-    session.add(Checkin(
-        date=day, submitted_at=end_at, overall_1_10=7, tags=[]))
+    session.add(Checkin(date=day, submitted_at=end_at, overall_1_10=3, tags=[]))
     session.commit()
 
     with_checkin = compute_day(session, day)
     assert with_checkin.data_completeness_pct == pytest.approx(71.4, abs=0.1)
     assert with_checkin.readiness.status != STATUS_INSUFFICIENT
+    assert with_checkin.subjective_anchored is True
+    assert with_checkin.readiness.score < NEUTRAL_SCORE, "a 3/10 is not an ordinary day"
