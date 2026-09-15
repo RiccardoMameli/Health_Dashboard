@@ -52,10 +52,21 @@ actually being said is "nothing adverse is visible" — which is not the same
 claim as "this was a good morning" and should not wear the same colour.
 
 So the median score of 56.2 is partly an artefact of which components happened
-to be available rather than of how he was doing. The candidate fix is small:
-cap the band at amber when no two-sided component is available, so green means
-measured and good rather than an absence of penalties. Not done — it is a
-scoring decision and he has wanted a say in those both times so far.
+to be available rather than of how he was doing.
+
+**Fixed the same day, once he asked for it.** The band is capped at amber when
+no two-sided component is available. Green now means measured and good; amber
+covers "nothing bad visible, but I could not see much". The number is
+untouched — capping by adjusting the score would corrupt every trend built on
+it — and only the colour and the accompanying sentence change.
+
+Withholding the score on those days was the other candidate and was rejected:
+it would blank 352 days, against the standing instruction that the dashboard
+stay useful on the mornings he forgets to measure. Red is left alone too, on
+the same logic in reverse — a saturated sleep debt is bad news whoever reports
+it, and the cap only ever moves a day down.
+
+Four tests cover it, two of which fail against the previous code.
 
 ### And one thing I had got wrong the other way
 

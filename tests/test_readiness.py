@@ -10,6 +10,7 @@ on its baseline contributes, so the less was known the better the day looked.
 import pytest
 
 from app.metrics.readiness import (
+    AMBER_AT,
     CONFIDENCE_FULL,
     CONFIDENCE_INSUFFICIENT,
     CONFIDENCE_PARTIAL,
@@ -241,3 +242,53 @@ def test_as_dict_is_serialisable_and_carries_the_breakdown_and_coverage():
     assert payload["top_contributors"][0]["factor"] == "rhr_deviation"
     assert isinstance(payload["score"], float)
     assert payload["coverage_pct"] == pytest.approx(out.coverage_pct, abs=0.05)
+
+
+# ── green has to mean measured and good ─────────────────────────────────────
+
+
+def test_a_day_with_only_penalties_cannot_show_green():
+    """Sleep debt and ACWR subtract or do nothing — they can never award
+    credit. A day carried by those alone has the neutral score as a ceiling,
+    so a clean reading says "nothing adverse is visible", which is a weaker
+    claim than "this morning went well" and must not wear the same colour.
+
+    On the real history this described 47% of scored days, 113 of which landed
+    exactly on neutral and rendered green next to fully measured good days.
+    """
+    out = score_for(sleep_debt_14d_min=0.0, sleep_debt_nights=14, acwr=1.0)
+    assert out.score == pytest.approx(NEUTRAL_SCORE), "the ceiling, as expected"
+    assert out.status == STATUS_AMBER, "not green: nothing was measured that could go up"
+    assert "not go badly" in out.note
+
+
+def test_the_number_itself_is_untouched_by_the_cap():
+    """Only what the score is called changes. Capping the band by adjusting
+    the score would corrupt every trend built on it."""
+    out = score_for(sleep_debt_14d_min=0.0, sleep_debt_nights=14, acwr=1.0)
+    assert out.score == pytest.approx(NEUTRAL_SCORE)
+
+
+def test_one_two_sided_component_is_enough_to_earn_green():
+    """The cap is about what could be measured, not how much. A single
+    two-sided reading can say a morning went well, so it restores green."""
+    capped = score_for(sleep_debt_14d_min=0.0, sleep_debt_nights=14, acwr=1.0)
+    earned = score_for(
+        sleep_debt_14d_min=0.0, sleep_debt_nights=14, acwr=1.0, sleep_duration_z=0.8
+    )
+    assert capped.status == STATUS_AMBER
+    assert earned.status == STATUS_GREEN
+    assert earned.score > capped.score
+
+
+def test_the_cap_never_makes_a_day_look_better():
+    """Red is a real finding from a one-sided component — a saturated sleep
+    debt is bad news whoever reports it — so the cap must not lift it."""
+    out = score_for(sleep_debt_14d_min=100_000.0, sleep_debt_nights=14, acwr=3.0)
+    assert out.score < AMBER_AT
+    assert out.status == STATUS_RED
+
+
+def test_a_fully_measured_ordinary_day_is_still_green():
+    """The cap must not touch days that actually measured something."""
+    assert score_for(**NEUTRAL).status == STATUS_GREEN

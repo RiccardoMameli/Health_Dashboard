@@ -58,6 +58,19 @@ NEUTRAL_SCORE = 75.0
 #: scores stay roughly comparable even though the formula changed.
 SIGNAL_SPAN = 45.0
 
+#: Components whose signal can only ever be negative. There is no such thing
+#: as less than no sleep debt, and a well-judged training load earns no
+#: credit — both subtract or do nothing.
+#:
+#: This matters because of what it does to the top of the scale. A day whose
+#: only available components are these cannot score above `NEUTRAL_SCORE`
+#: however well it actually went, so a clean reading from them means "nothing
+#: adverse is visible", not "this was a good morning". Measured over the real
+#: history on 15 Sep 2026, that described **47% of scored days**, with 113 of
+#: them landing exactly on the neutral score and rendering green —
+#: indistinguishable from a fully measured good day.
+ONE_SIDED_FACTORS = frozenset({"sleep_debt_14d", "acwr"})
+
 #: Nights of observed sleep before an accumulated debt is worth scoring. One
 #: short night is a fact about one night, not a fortnight's debt.
 MIN_NIGHTS_FOR_SLEEP_DEBT = 3
@@ -371,7 +384,23 @@ def compute_readiness(
     if data.hrv_deviation_z is None and confidence == CONFIDENCE_FULL:
         confidence = CONFIDENCE_REDUCED
 
-    if missing:
+    # Green has to mean "measured and good". When every available component is
+    # one-sided the score's ceiling is the neutral point, so the best it can
+    # report is an absence of penalties — which is a weaker claim and should
+    # not wear the same colour as a good morning that was actually measured.
+    # The number is untouched; only what it is called changes.
+    status = _band(score)
+    one_sided_only = bool(present) and set(present) <= ONE_SIDED_FACTORS
+    if one_sided_only and status == STATUS_GREEN:
+        status = STATUS_AMBER
+
+    if one_sided_only:
+        note = (
+            f"Nothing adverse showing in {_phrase(present)} — but that is "
+            f"{coverage:.0f}% of the picture, and none of it can tell you a "
+            f"morning went *well*, only that it did not go badly."
+        )
+    elif missing:
         note = (
             f"Based on {_phrase(present)} — {coverage:.0f}% of the full picture. "
             f"No reading for {_phrase(missing)}, so this is what today's data "
@@ -382,7 +411,7 @@ def compute_readiness(
 
     return Readiness(
         score=score,
-        status=_band(score),
+        status=status,
         confidence=confidence,
         components=components,
         coverage_pct=coverage,
