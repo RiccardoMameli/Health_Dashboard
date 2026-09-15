@@ -32,16 +32,25 @@ BASELINE_WINDOW_DAYS = 30
 #: A fixed 30-day window silently assumes the watch is worn most nights. The
 #: owner's real history is 461 nights across 2,042 days — 23% wear — and 14
 #: observations inside any 30 days needs 47% wear sustained across that
-#: window. Measured against his actual pattern, the fixed window produced a
-#: reportable sleep baseline on **2.8% of days**: five and a half years of
-#: imported history, almost none of it usable.
+#: window.
 #:
-#: Reaching back to 90 days when 30 is not enough takes that to **69.9%**. It
-#: is the same statistical requirement — still 14 real observations, still no
-#: interpolation — it simply stops also demanding they be recent. The cost is
-#: real and is reported rather than hidden: `span_days` says how far back the
-#: observations actually reach, which at this wear rate is a median of 62
-#: days, so the baseline moves slower than a 30-day one would.
+#: **Measured over the whole history on 15 Sep 2026** (`verify_readiness.py`):
+#: the 30-day window alone gives a reportable sleep baseline on 19.5% of days;
+#: preferring 30 and widening to 90 gives **30.8%**. Widening further does not
+#: help — 180 and 365 day caps return the same figure, because outside his
+#: dense stretches even a year does not contain 14 nights, and inside them 30
+#: days already did.
+#:
+#: That is a real improvement and worth keeping, but it is a third of what was
+#: predicted when this was written. The estimate of 69.9% came from modelling
+#: his wear as evenly-spaced clusters; the real pattern is dense streaks
+#: separated by long dead periods, which the model did not capture. Recorded
+#: because the number was quoted in three places before anyone measured it.
+#:
+#: The cost is smaller than feared too: `span_days` reports how far back the
+#: observations reach, and the real median is 30 days, not the 62 estimated —
+#: most baselines come from the preferred window and the widening fires on a
+#: minority.
 BASELINE_MAX_WINDOW_DAYS = 90
 
 #: Wear-bias guard (D3): fewer than this many nights worn in any rolling 7
