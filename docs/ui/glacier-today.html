@@ -756,7 +756,7 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
       </div>
       <div class="foot">
         <span class="src s-samsung"><i></i>Samsung Health</span>
-        <span class="micro">—</span>
+        <span class="micro" id="sleepBaselineAge">—</span>
       </div>
     </section>
 
@@ -1104,6 +1104,15 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
       baseEl.style.bottom = (100 * s.sleep.baseline / SLEEP_SCALE_MIN).toFixed(1) + '%';
       set('sleepBaselineLabel', 'baseline ' + minutesLabel(s.sleep.baseline));
     }
+    /* How old the comparison is. The window reaches back up to 180 days when
+       nights are sparse, so a deviation can be measured against nights from
+       months ago — and a screen that shows the deviation without its age
+       overstates what it knows. Nights first, because fourteen nights across
+       four months and fourteen across four weeks are different evidence. */
+    set('sleepBaselineAge',
+        s.sleep.baselineNights
+          ? s.sleep.baselineNights + ' nights over ' + s.sleep.baselineSpanDays + ' days'
+          : '—');
   }
 
   function renderRhr(s){
@@ -1369,6 +1378,8 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
          invented history. They fill in when there is something to fill
          them with. */
       sleep: {nights: EMPTY_WEEK, baseline: (d.sleep && d.sleep.baseline_min) || null,
+              baselineNights: (d.sleep && d.sleep.baseline_nights) || null,
+              baselineSpanDays: (d.sleep && d.sleep.baseline_span_days) || null,
               delta: 'no data', deltaClass: 'flat'},
       rhr: {series: EMPTY_WEEK, median: (d.resting_hr && d.resting_hr.baseline) || null,
             delta: 'no data', deltaClass: 'flat'},

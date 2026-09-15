@@ -333,3 +333,18 @@ def test_the_today_screen_links_to_the_form_and_no_longer_fakes_it(client):
     assert 'href="/ui/checkin"' in body
     assert 'class="card soon checkin' not in body     # it is built now
     assert "Check in · about 25 seconds" not in body  # the placeholder's promise
+
+
+def test_today_reports_how_old_the_sleep_baseline_is(client, auth):
+    """The window reaches back up to 180 days when nights are sparse, so a
+    deviation can rest on nights from months ago. A payload that carries the
+    baseline without its age lets the screen overstate what it knows."""
+    body = client.get("/api/v1/today", headers=auth).json()
+    assert "baseline_nights" in body["sleep"]
+    assert "baseline_span_days" in body["sleep"]
+
+
+def test_the_sleep_tile_shows_the_baselines_age(client):
+    body = client.get("/ui").text
+    assert 'id="sleepBaselineAge"' in body
+    assert "baseline_nights" in body and "baseline_span_days" in body

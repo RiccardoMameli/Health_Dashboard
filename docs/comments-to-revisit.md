@@ -53,20 +53,6 @@ is blocked on something. This is the maybe pile.
 
 ## Open after the 15 Sep verification sweep
 
-- **Should the baseline cap move past 90 days?** The coverage is measured:
-  30 only 27.4%, 90 30.8%, 180 36.1%, 365 46.2%. The safety question is
-  measured too, and the answer is that his sleep norm is **stable** — 2024 and
-  2025, the only years with enough nights to judge, sit 16 minutes apart
-  (455 vs 471). A baseline reaching months back would compare him against much
-  the same norm.
-
-  The framing that matters: on the days a wider cap adds, the alternative is
-  not a fresher baseline, it is **no score at all**. Recommended 180 rather
-  than 365 — six months stays inside one seasonal half, where a year blends
-  summer and winter sleep — paired with showing `span_days` on the screen so a
-  score resting on a five-month-old baseline says so. Not done; the owner
-  decides.
-
 - **2023 has no sleep data at all**, and 2026 holds 19 nights against 2024's
   250. Worth knowing before reading anything into year-over-year figures.
 
@@ -104,6 +90,13 @@ is blocked on something. This is the maybe pile.
   entirely was rejected: it would have blanked 352 days, against the owner's
   standing instruction that the dashboard stay useful when he forgets to
   measure.
+
+- **Should the baseline cap move past 90 days?** Yes, to 180. Done 15 Sep.
+  Coverage 27.4 / 30.8 / 36.1 / 46.2% for 30 / 90 / 180 / 365. Safe because
+  the norm is stable (2024 and 2025 sixteen minutes apart) and because on the
+  days it adds the alternative was no score at all. Stopped at 180 rather than
+  365 so the window stays inside one seasonal half. `span_days` now shows on
+  the sleep tile, so a baseline reaching five months back says so.
 
 - **Does the readiness score need extrapolating when data is thin?** No.
   Renormalising the weights and taking a weighted mean are the same equation,

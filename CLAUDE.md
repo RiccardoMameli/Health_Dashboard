@@ -59,13 +59,20 @@ watch every night and a dashboard that goes blank when he forgets is one that
 stops being opened. Every partial score carries its coverage and a sentence
 naming what it rests on.
 
-**Baselines prefer 30 days and widen to 90 when too sparse.** Measured over
-all 2,041 days (`scripts/verify_readiness.py`): 30 days alone gives a
-reportable sleep baseline on **27.4%** of days, widening to 90 gives
-**30.8%** — so the adaptive rule buys +3.4 points. Reaching further keeps
-paying (180 → 36.1%, 365 → 46.2%), and whether to take that is **an open
-decision**: the days it adds are the ones whose nearest fourteen nights are
-months old. Left at 90 for now.
+**Baselines prefer 30 days and widen to 180 when too sparse** (set 15 Sep
+2026). Measured over all 2,041 days (`scripts/verify_readiness.py`): 30 days
+alone gives a reportable sleep baseline on 27.4% of days, 90 gives 30.8%,
+**180 gives 36.1%**, 365 gives 46.2%.
+
+180 and not 365 because six months stays inside one seasonal half where a year
+blends summer and winter sleep. Safe because his norm is stable — 2024 and
+2025, the only years with enough nights to judge, sit 16 minutes apart — and
+because on the days a wider cap adds, the alternative is not a fresher
+baseline but **no score at all**.
+
+**The honesty mechanism is `span_days`**, shown on the Today screen's sleep
+tile as "25 nights over 151 days". A baseline reaching five months back is
+fine as long as it says so.
 
 Do not quote a coverage figure for this that did not come from a run against
 his database. Three wrong ones have been published already — 69.9% from a

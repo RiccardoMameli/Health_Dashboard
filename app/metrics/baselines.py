@@ -42,14 +42,20 @@ BASELINE_WINDOW_DAYS = 30
 #:     prefer 30, widen to 180   736 days   36.1%
 #:     prefer 30, widen to 365   942 days   46.2%
 #:
-#: So widening to 90 buys **+3.4 points**, and reaching further keeps paying —
-#: a year-long cap would nearly double the 30-day figure. Whether that is
-#: worth taking is a question about what a baseline is *for*, not about
-#: coverage: the days it would add are precisely the ones where the nearest
-#: fourteen nights are months old, and a deviation measured against a stale
-#: median is a weaker claim than one measured against a current median.
-#: Deliberately left at 90 pending that decision; `span_days` reports the real
-#: reach of every baseline so the cost is visible rather than assumed.
+#: **Set to 180 on 15 Sep 2026**, taking coverage to 36.1%. Two measurements
+#: decided it. His sleep norm is stable — 2024 and 2025, the only years with
+#: enough nights to judge, sit 16 minutes apart (455 against 471) — so a
+#: baseline reaching months back compares him against much the same norm. And
+#: on the days a wider cap adds, the alternative is not a fresher baseline but
+#: **no score at all**, which loses to a stale one that admits its age.
+#:
+#: 180 rather than 365, though 365 would reach 46.2%: six months stays inside
+#: one seasonal half, where a year blends summer and winter sleep. The extra
+#: coverage is not worth a baseline that averages across both.
+#:
+#: The honesty mechanism is `span_days`, which reports how far back each
+#: baseline actually reaches and is surfaced on the Today screen. A score
+#: resting on a five-month-old comparison has to say so.
 #:
 #: This constant has now attracted three wrong numbers, all from estimating
 #: instead of measuring. It was predicted to lift coverage to 69.9% — that
@@ -58,7 +64,7 @@ BASELINE_WINDOW_DAYS = 30
 #: "widening past 90 buys nothing" were published as measurements when both
 #: came from an 87-day synthetic database. The numbers above are from his
 #: real history and nothing else.
-BASELINE_MAX_WINDOW_DAYS = 90
+BASELINE_MAX_WINDOW_DAYS = 180
 
 #: Wear-bias guard (D3): fewer than this many nights worn in any rolling 7
 #: makes the sleep baseline a baseline of the nights you chose to measure.

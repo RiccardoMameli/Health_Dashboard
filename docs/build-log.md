@@ -6,6 +6,65 @@ of each working session.
 
 ---
 
+## 15 September 2026 (later still) — the cap moves to 180, and says how old it is
+
+Two measurements settled a decision that had been argued about twice, and both
+measurements had to be fixed first because neither worked.
+
+### The two broken measurements
+
+The span column read **30 days for every candidate rule**, including the
+365-day one. A median across all of a rule's days sits inside his dense
+stretches where 30 days always sufficed, so it was structurally blind to the
+tail where widening actually operates — it could not have discriminated
+between the rules whatever the data said. It now reports the span of the days
+each rule *adds*, which is where the staleness lives.
+
+The drift check let a year of nineteen nights outvote a year of two hundred
+and fifty. It reported a 75-minute spread and concluded the sleep norm drifts;
+weighted by sample size the spread is **16 minutes** — 2024's 455 against
+2025's 471 — and the norm is stable. A thin sample had been promoted into a
+design decision, which is the same failure as quoting a synthetic number as a
+measurement, arriving from a different direction.
+
+### What the corrected measurements said
+
+    30-day window only   27.4%
+    prefer 30, widen 90  30.8%
+    prefer 30, widen 180 36.1%   <- chosen
+    prefer 30, widen 365 46.2%
+
+Stopped at 180 rather than 365, despite ten more points being available: six
+months stays inside one seasonal half, where a year blends summer and winter
+sleep into one median. The extra coverage is not worth a baseline that
+averages across both.
+
+The framing that decided it: **on the days a wider cap adds, the alternative is
+not a fresher baseline — it is no score at all.** A stale comparison that
+admits its age beats silence.
+
+### Which is only true if it does admit its age
+
+So `span_days`, computed since the 14th and displayed nowhere, is now on the
+sleep tile: *"25 nights over 151 days"*. Nights first, because fourteen nights
+across four months and fourteen across four weeks are different evidence and
+the count alone does not distinguish them.
+
+Verified against a deliberately sparse history — 20 nights scattered over five
+months — which produces a baseline reaching 151 days back. Under the old
+90-day cap that day had no baseline at all; it now has one, and the screen
+says exactly how far it reaches.
+
+### Also noticed, not acted on
+
+2023 holds **no sleep data whatsoever**, and 2026 holds 19 nights against
+2024's 250. And 2026's median is 396 minutes against 455 and 471 in the two
+years before it. At that sample size it is probably noise — but if it is real
+it is an hour less sleep a night, which would be the most interesting thing in
+the dataset. Worth re-checking once the Air produces a denser sample.
+
+---
+
 ## 15 September 2026 (later) — the prediction was a third right
 
 `scripts/verify_readiness.py` walks every day of the imported history and
