@@ -53,6 +53,28 @@ is blocked on something. This is the maybe pile.
 
 ## Open after the 15 Sep verification sweep
 
+- **Should the baseline cap move past 90 days?** The coverage is measured:
+  30 only 27.4%, 90 30.8%, 180 36.1%, 365 46.2%. The safety question is
+  measured too, and the answer is that his sleep norm is **stable** — 2024 and
+  2025, the only years with enough nights to judge, sit 16 minutes apart
+  (455 vs 471). A baseline reaching months back would compare him against much
+  the same norm.
+
+  The framing that matters: on the days a wider cap adds, the alternative is
+  not a fresher baseline, it is **no score at all**. Recommended 180 rather
+  than 365 — six months stays inside one seasonal half, where a year blends
+  summer and winter sleep — paired with showing `span_days` on the screen so a
+  score resting on a five-month-old baseline says so. Not done; the owner
+  decides.
+
+- **2023 has no sleep data at all**, and 2026 holds 19 nights against 2024's
+  250. Worth knowing before reading anything into year-over-year figures.
+
+- **2026's median is 396 min against 455 and 471 in the two years before it.**
+  On 19 nights that is probably noise, but if it is real it is an hour less
+  sleep a night and by far the most interesting thing in the dataset. Worth
+  re-checking once the Air produces a denser sample.
+
 - **The 10% coverage floor never fires.** Zero days across five years were
   refused with partial coverage below it; every refusal was at 0% coverage.
   The constant is currently decorative. Harmless, but it means the floor is

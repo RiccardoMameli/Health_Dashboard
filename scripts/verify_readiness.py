@@ -55,6 +55,13 @@ PREVIOUS_BASELINE_COVERAGE_PCT = 2.8
 #: Below this many days there is not enough history to say anything.
 MIN_DAYS_TO_REPORT = 30
 
+#: Nights in a calendar year before that year's median is allowed to vote on
+#: whether the sleep norm drifts. Without it a year holding nineteen nights
+#: carries the same weight as one holding two hundred and fifty, and the thin
+#: one decides — which is how a small sample gets promoted into a design
+#: decision.
+MIN_NIGHTS_TO_WEIGH = 50
+
 #: Components whose signal can only ever be negative: there is no such thing
 #: as *less than no* sleep debt, or a training load so well judged it earns
 #: credit. A day whose only available components are these cannot score above
@@ -105,32 +112,43 @@ def compare_windows(session, first: Date, last: Date) -> None:
     span = (last - first).days + 1
     series = [by_date.get(first + timedelta(days=i)) for i in range(span)]
 
+    # The staleness cost has to be measured on the days a rule *adds*, not on
+    # all of its days. A median over everything sits inside his dense stretches
+    # where 30 days always sufficed, so it reads 30 for every rule including
+    # the 365-day one and says nothing at all — which is exactly what the first
+    # version of this table did.
     results = {}
-    print(f"  {'rule':<26} {'days':>6}  {'cover':>6}  {'median span':>12}")
+    previous: set[int] = set()
+    print(f"  {'rule':<26} {'days':>6}  {'cover':>6}   {'days this rule adds':>28}")
     for label, preferred, longest in (
         ("30-day window only", 30, 30),
         ("prefer 30, widen to 90", 30, BASELINE_MAX_WINDOW_DAYS),
         ("prefer 30, widen to 180", 30, 180),
         ("prefer 30, widen to 365", 30, 365),
     ):
-        usable, spans = 0, []
+        usable: set[int] = set()
+        spans: dict[int, int] = {}
         for end in range(span):
             window = series[max(0, end - longest + 1) : end + 1]
             base = rolling_baseline(window, preferred_days=preferred, max_days=longest)
             if base.reportable:
-                usable += 1
-                spans.append(base.span_days)
-        results[label] = usable / span * 100
-        spans.sort()
-        median_span = spans[len(spans) // 2] if spans else 0
-        print(f"  {label:<26} {usable:>6,}  {results[label]:5.1f}%  "
-              f"{median_span:>9} days")
+                usable.add(end)
+                spans[end] = base.span_days
+        results[label] = len(usable) / span * 100
+
+        added = sorted(spans[d] for d in usable - previous)
+        if added:
+            note = (f"{len(added):>5,}, reaching back "
+                    f"{added[len(added) // 2]:>3}-{added[-1]:>3} days")
+        else:
+            note = f"{0:>5}"
+        print(f"  {label:<26} {len(usable):>6,}  {results[label]:5.1f}%   {note:>28}")
+        previous = usable
 
     gain = results["prefer 30, widen to 90"] - results["30-day window only"]
     print(f"\n  widening to 90 buys {gain:+.1f} points over a plain 30-day window")
-    print("  the rows below it say what reaching further would buy, and the span")
-    print("  column says what it costs: those extra days are the ones whose")
-    print("  nearest fourteen nights are months old")
+    print("  the last column is the cost: how far back the baselines are on the")
+    print("  days each rule adds, which is where the staleness actually lives")
 
     # Whether a wide window is *safe* is a different question from whether it
     # is available, and it has an answer in the data: if the sleep norm barely
@@ -141,26 +159,38 @@ def compare_windows(session, first: Date, last: Date) -> None:
     by_year: dict[int, list[float]] = {}
     for day, duration in by_date.items():
         by_year.setdefault(day.year, []).append(duration)
-    yearly = []
-    for year in sorted(by_year):
-        values = sorted(by_year[year])
-        if len(values) < 14:
-            print(f"    {year}   {len(values):>4} nights   (too few to say)")
+
+    # A year of 19 nights and a year of 250 are not comparable evidence, and
+    # letting the thin one set the verdict is how a small sample gets promoted
+    # into a design decision. Thin years are shown and excluded from the sum.
+    weighed = []
+    for year in range(min(by_year), max(by_year) + 1):
+        values = sorted(by_year.get(year, []))
+        if not values:
+            print(f"    {year}   {0:>4} nights   (nothing recorded at all)")
             continue
         median = values[len(values) // 2]
-        yearly.append(median)
+        thin = len(values) < MIN_NIGHTS_TO_WEIGH
         print(f"    {year}   {len(values):>4} nights   median {median:6.0f} min "
-              f"({median / 60:.1f}h)")
-    if len(yearly) >= 2:
-        drift = max(yearly) - min(yearly)
-        print(f"\n    spread across years: {drift:.0f} min")
-        if drift <= 20:
-            print("    -> stable. A baseline reaching back a year would compare him")
+              f"({median / 60:.1f}h)"
+              f"{'   too thin to weigh' if thin else ''}")
+        if not thin:
+            weighed.append((year, median))
+
+    if len(weighed) >= 2:
+        medians = [m for _, m in weighed]
+        drift = max(medians) - min(medians)
+        years = ", ".join(str(y) for y, _ in weighed)
+        print(f"\n    across the years with enough nights to judge ({years}): "
+              f"{drift:.0f} min apart")
+        if drift <= 30:
+            print("    -> stable. A baseline reaching months back would compare him")
             print("       against much the same norm, so a wider cap looks safe.")
         else:
-            print("    -> it drifts. A year-long window would partly be measuring")
-            print("       that drift rather than last night, which argues for")
-            print("       keeping the cap short even at the cost of coverage.")
+            print("    -> it drifts, and a wide window would partly be measuring")
+            print("       that drift rather than last night.")
+    else:
+        print("\n    not enough well-sampled years to say either way")
 
 
 def main() -> int:
