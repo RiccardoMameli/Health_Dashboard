@@ -68,9 +68,14 @@ measured; that estimate modelled evenly-spaced wear and the real pattern is
 dense streaks separated by long gaps.
 
 **Consequence: most days still cannot be scored.** 752 of 2,041 days score,
-1,289 refuse at 0% coverage. Of the scored days, 47% have no component
-available except sleep debt and ACWR — both penalties with no credit — so
-they can only report neutral-or-worse. See `comments-to-revisit.md`.
+1,289 refuse at 0% coverage.
+
+**Green means measured and good.** Sleep debt and ACWR are penalties with no
+credit, so a day carried by those alone has the neutral score as a ceiling:
+the best it can say is "nothing adverse is visible". That described 47% of
+scored days, 113 of which sat exactly on neutral and rendered green. Since
+15 Sep the band is **capped at amber when no two-sided component is
+available** — the number is untouched, only its colour and wording change.
 
 **Samsung Health is historical only as of 15 Sep 2026 (plan D14).** The
 overnight sensor becomes a **Fitbit Air**, and sleep, resting HR, HRV and SpO2

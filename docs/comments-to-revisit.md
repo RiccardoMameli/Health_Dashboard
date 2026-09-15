@@ -53,18 +53,6 @@ is blocked on something. This is the maybe pile.
 
 ## Open after the 15 Sep verification sweep
 
-- **Nearly half of scored days can only report neutral-or-worse.** 352 of 752
-  scored days (47%) had no component available except sleep debt and ACWR,
-  both of which are penalties with no credit: there is no such thing as less
-  than no sleep debt. Those days have the neutral score as a *ceiling*. A
-  further 113 land exactly on neutral and read green, where what is actually
-  being said is "nothing adverse is visible", which is not the same as "this
-  was a good morning". The median score of 56.2 is partly an artefact of which
-  components happened to be available. **The candidate fix is to cap the band
-  at amber when no two-sided component is available** — green should mean
-  measured and good, not an absence of penalties. Not done: it is a scoring
-  decision and the owner has wanted a say in those.
-
 - **The 10% coverage floor never fires.** Zero days across five years were
   refused with partial coverage below it; every refusal was at 0% coverage.
   The constant is currently decorative. Harmless, but it means the floor is
@@ -83,6 +71,17 @@ is blocked on something. This is the maybe pile.
   and outside a streak even 90 days does not hold 14 nights. The change is a
   real improvement and is keeping, but the figure quoted in CLAUDE.md and the
   build log was wrong and is corrected.
+
+- **Should a one-sided component be allowed to carry a day on its own?** Yes,
+  but not to award green. Measured on 15 Sep: 47% of scored days had nothing
+  available but sleep debt and ACWR, both penalties with no credit, so their
+  ceiling was the neutral score — and 113 of them landed exactly on it and
+  rendered green beside fully measured good days. Fixed the same day by
+  capping the band at amber when no two-sided component is available. The
+  number is untouched; only what it is called changes. Withholding the score
+  entirely was rejected: it would have blanked 352 days, against the owner's
+  standing instruction that the dashboard stay useful when he forgets to
+  measure.
 
 - **Does the readiness score need extrapolating when data is thin?** No.
   Renormalising the weights and taking a weighted mean are the same equation,
