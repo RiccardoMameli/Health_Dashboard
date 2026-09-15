@@ -3,7 +3,7 @@
 Everything known to be needed and not done, with what actually unblocks each
 item. Kept separate from `build-log.md`, which records what *has* been built.
 
-**Last reviewed: 14 September 2026** (readiness reworked).
+**Last reviewed: 15 September 2026** (D14: Fitbit Air and the Google Health API).
 
 See also `comments-to-revisit.md` — the maybe pile, for things noticed and
 deliberately not acted on.
@@ -37,7 +37,12 @@ deployed.
 |---|---|---|---|
 | A1 | **Withings integration** | No developer credentials; OAuth2 flow needs a browser redirect | Register a personal app at developer.withings.com, put client id/secret in `.env`, complete the OAuth flow once |
 | A2 | ~~**Samsung Health export**~~ | **Done 11 Sep 2026.** 461 sleep sessions, 1,950 days of steps, 63 weight readings, 159 nights of resting HR, Feb 2021 to Sep 2026 | Nothing. Re-run the importer against a fresh export whenever more history is wanted; it is idempotent |
-| A3 | **Sleep ingestion, ongoing** | Needs the Phase 3 companion app; no cloud API exists (plan §3.3). History is covered by A2; the nightly feed is not | The Expo dev build. Until then sleep stops at the date of the last export |
+| A3 | **Sleep ingestion, ongoing** | **Reframed 15 Sep 2026 (D14).** No longer needs a phone app: the Google Health API is a cloud endpoint, so this becomes a server-side adapter like Hevy's. History is covered by A2; the nightly feed still is not | The Fitbit Air arriving, **and R14 settled first** — restricted scopes may cap refresh tokens at 7 days, which would break a daily cron weekly. Until then sleep stops at the date of the last export |
+
+**Samsung Health is historical only as of 15 Sep 2026 (D14).** The export is
+the archive; there is no ongoing feed and none is planned. Take one final
+export when the Air arrives — the importer is idempotent, so a later export
+extends the history rather than duplicating it.
 
 The Samsung parser deliberately leaves HRV, sleep stages as a series, stress,
 SpO2, skin temperature, respiratory rate, floors and Samsung's own exercise
@@ -106,7 +111,9 @@ The Today screen came first for that reason.
 
 | # | Item | Resolution |
 |---|---|---|
-| E1 | **HRV and SpO2 via Health Connect** | Samsung confirms sleep, heart rate, steps and exercise reach Health Connect. It does not confirm HRV, SpO2 or body composition. `HRV_AVAILABLE=false` until tested on the actual watch |
+| E1 | **HRV and SpO2** | **Probably resolved by D14.** The Google Health API lists HRV (RMSSD/SDNN) and SpO2 among its ~40 types, where Samsung never confirmed them for Health Connect. `HRV_AVAILABLE=false` until seen in a real response, not a docs listing |
+| E4 | **Google Health API restricted scopes** | Every scope is Restricted and needs a privacy/security review for production. Unverified apps stay in Testing, where **refresh tokens expire after 7 days** — a weekly silent break on a daily cron. Unknown whether a single-user project can be verified. Answer before building (plan R14) |
+| E5 | **Does the Google Health API serve third-party data?** | Google says apps connected via Health Connect sync into the Google Health *app*; whether that data comes back out of the *API* is unconfirmed. Nothing is designed to depend on it — the Air is first-party — but it decides whether the Samsung-to-Air gap closes itself |
 | E2 | Hevy API rate limits | Undocumented. The adapter throttles at 0.35s and backs off on 429; 28 sequential pages completed without incident on 10 Sep |
 | E3 | Free-tier limits for B2–B6 | Researched 3 Sep 2026; re-verify at signup |
 

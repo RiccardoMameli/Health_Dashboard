@@ -14,14 +14,18 @@
 |---|---|---|---|
 | D1 | Nutrition app | **MyFitnessPal** | Calories automate via Health Connect; **macros do not** — see §3.4. This is the weakest link in the stack. |
 | D2 | Hevy Pro | **Yes, owned** | Hevy REST API available from day one. Phase 1 unblocked. |
-| D3 | Watch | **Galaxy Watch8 Classic**, worn overnight only sometimes | Sleep is the backbone of the system. Overnight wear becomes a hard requirement during baseline — see §3.3. |
+| D3 | Watch | ~~**Galaxy Watch8 Classic**, worn overnight only sometimes~~ | **Superseded by D14, 15 Sep 2026.** Retained because the reasoning still holds: sleep is the backbone of the system, and overnight wear is a hard requirement during baseline — see §3.3. |
 | D4 | Budget | **Comfortable with running costs** | Design for correctness over penny-pinching, but §4.4 still lands at roughly £0/month plus Claude API usage. |
 | D5 | Delivery | **Email or WhatsApp first; wants a real app eventually** | Architecture pivots to a single React Native codebase — see §4.2. Email for v1, native push once the app ships. |
 | D6 | Alcohol / caffeine | **Not now; add after beta** | Tags stay in the check-in (zero cost, one tap); quantified fields deferred. Explanatory power is capped until then — see §7.2. |
 | D7 | Smart scale | **Withings, syncing to Health Connect** | Use the **Withings API directly** — free tier, OAuth2 — rather than routing through Health Connect. See §3.2. |
 | D8 | 6-week baseline before causal claims | **Accepted** | Phase model in §2.2 stands as written. |
-| D9 | Historical backfill | **As much as possible** | One-off Samsung Health export for deep history; Hevy and Withings backfill via API. See §3.5. |
+| D9 | Historical backfill | **As much as possible** | One-off Samsung Health export for deep history — **done 11 Sep 2026**, 461 nights back to Feb 2021; Hevy and Withings backfill via API. See §3.5. |
 | D10 | Access model | **Cheapest and fastest** | No custom domain, no public registration. Single-user magic-link auth on free hosting tiers. See §13. |
+| D11 | Load basis when RPE is absent | **Volume-derived, labelled** | Recorded 10 Sep 2026. Volume tracks exercise selection more than stress, so the basis is carried with the figure and mixed windows are refused — see §6.2. |
+| D12 | Readiness formula | **A mean over what was measured, not a deduction from 100** | Changed 14 Sep 2026, departing from §6.3. The old formula scored a day best when it knew least. Coverage replaces completeness as the gate — see §6.3. |
+| D13 | Baseline window | **Prefer 30 days, widen to 90 when sparse** | Changed 14 Sep 2026. A fixed 30-day window gave a usable sleep baseline on 2.8% of real days; the adaptive one gives 69.9%. |
+| D14 | Overnight sensor and its API | **Fitbit Air + Google Health API**, replacing Galaxy Watch8 + Health Connect | Decided 15 Sep 2026. A cloud API removes the companion app from the critical path and may finally supply HRV. Two unknowns gate it — restricted-scope verification and third-party data provenance. See §3.3. |
 
 ### 0.1 What changed from v0.1
 
@@ -31,13 +35,36 @@
 4. **Delivery simplified to email, then native push.** WhatsApp is disproportionate effort for this job — see §11.
 5. **MyFitnessPal's limits made explicit.** It syncs calories to Health Connect but not macros, and protein is central to your recomposition goal.
 
+### 0.2 What changed on 15 September 2026 (D14)
+
+1. **The overnight sensor is a Fitbit Air, not a Galaxy Watch8 Classic.** The
+   reason is wear, not sensors. §3.3 always said overnight wear was the weak
+   point; the measured history says 23%.
+2. **Sleep and vitals now arrive over a cloud API.** The Fitbit app became
+   Google Health in May 2026 and the Fitbit Web API is replaced by the Google
+   Health API at `health.googleapis.com/v4/`, Google OAuth2. Health Connect
+   had no cloud endpoint, which was the whole reason the companion app existed.
+3. **The companion app leaves the critical path.** Phase 3 splits into a
+   server-side feed (3a) that unblocks Phase 2's gate, and a UI/push project
+   (3b) that nothing depends on. MyFitnessPal calories are now the only data
+   path still needing something on the phone.
+4. **HRV is probably answered.** The API lists HRV as RMSSD/SDNN, open since
+   the plan was written (R4). Verify against a real response before setting
+   `HRV_AVAILABLE`.
+5. **Samsung Health becomes historical only.** The one-off export is imported
+   and stays the archive; there is no ongoing Samsung feed and none is planned.
+6. **Two new unknowns, one of them serious.** Restricted-scope verification and
+   the seven-day refresh token (R14), and whether third-party Health Connect
+   data is served by the cloud API at all. Nothing is designed to depend on the
+   second.
+
 ---
 
 ## 1. Problem statement and success criteria
 
 ### 1.1 The problem
 
-Health data is fragmented across Samsung Health, Hevy, MyFitnessPal and Withings. None of them talk to each other, none of them know about supplements, and none of them know how you actually felt. The result is a lot of measurement and very little insight.
+Health data is fragmented across Google Health, Hevy, MyFitnessPal and Withings (and, historically, Samsung Health). None of them talk to each other, none of them know about supplements, and none of them know how you actually felt. The result is a lot of measurement and very little insight.
 
 ### 1.2 What "done" looks like
 
@@ -126,13 +153,16 @@ Social features. Multi-user support. Real-time streaming. Medical diagnosis of a
 
 ## 3. Data sources — verified availability
 
-Researched 3 September 2026. Re-verify at implementation time.
+Researched 3 September 2026; §3.3 rewritten 15 September 2026 for D14.
+Re-verify at implementation time — the Google Health API is three months old at
+the time of writing and the Fitbit Web API it replaces sunsets this month.
 
 | Source | Access method | Automated? | Confidence |
 |---|---|---|---|
 | **Hevy** | Public REST API, `api-key` header — **Pro owned** | Yes, day one | High |
 | **Withings scale** | Public Health Data API, OAuth2, free tier | Yes, day one | High |
-| **Samsung Health / Health Connect** | On-device Android API — needs the companion app (§3.3) | Phase 3 | High |
+| **Fitbit Air / Google Health** | Cloud REST API, `health.googleapis.com/v4/`, Google OAuth2 (§3.3) | Yes, once authorised | Medium — see the two unknowns in §3.3 |
+| ~~Samsung Health / Health Connect~~ | **Historical only** as of D14. The one-off export is imported; there is no ongoing feed and none is planned | Done, one-off | High |
 | **MyFitnessPal** | Calories via Health Connect; macros only via Premium CSV | Partial | Medium |
 | **Subjective check-in** | Your own form | N/A | N/A |
 
@@ -162,19 +192,79 @@ Your scale already syncs to Health Connect, but going direct is the better call:
 - Store the refresh token securely and handle rotation — Withings refresh tokens are single-use on some flows, so persist the new one on every refresh or you will silently lose access in a fortnight.
 - Deep historical backfill available via date-ranged queries. Do it once at setup.
 
-### 3.3 Samsung Health → your backend
+### 3.3 Sleep and vitals — the Google Health API
 
-**Health Connect is an on-device Android API. There is no cloud endpoint.** Data has to be pushed off the phone by something running on the phone.
+**Revised 15 September 2026 (D14).** This section previously described getting
+Samsung Health data off an Android phone, because Health Connect is an
+on-device API with no cloud endpoint and something had to run on the device.
+That constraint no longer applies to the primary path.
 
-**Primary route — the companion app (Phase 3).** `react-native-health-connect` is a maintained Android library that works with Expo via a config plugin and a development build. The app reads Health Connect on a background schedule and POSTs to your API.
+**The device changed.** A **Fitbit Air** (Google, launched 7 May 2026, £/$99,
+screenless, seven-day battery, 12g) replaces the Galaxy Watch8 Classic as the
+overnight sensor. The reason is not the sensor suite, it is that it will
+actually be worn: the previous plan depended on wearing a watch to bed and
+§3.3 itself admitted that was the weak point. A 12g screenless pebble is a
+different proposition from a Classic watch, and the whole readiness score
+rests on overnight wear happening.
 
-**Fallback route — Health Sync → Google Drive CSV.** Health Sync (Play Store, small one-off cost) reads Samsung Health and Health Connect and writes scheduled CSV exports to Google Drive, which your backend polls via the Drive API. Keep this documented as a contingency; do not build it unless needed.
+**The platform changed with it.** The Fitbit app became **Google Health** on
+19 May 2026, and the Fitbit Web API — which sunsets **September 2026**, i.e.
+now — is replaced by the **Google Health API** at `health.googleapis.com/v4/`,
+authenticated with standard Google OAuth 2.0. This is a genuine cloud API.
 
-**Known risk — HRV and SpO2.** Samsung's documentation confirms activity, steps, exercise, heart rate and sleep synchronise to Health Connect. It does **not** confirm HRV, SpO2 or body composition. **Verify empirically in Phase 3 before the readiness score depends on HRV.** The fallback readiness formula (§6.3) uses sleep and resting HR only.
+**What that removes.** The companion app was the single largest remaining
+piece of unbuilt work in this plan, and its primary justification was that
+Health Connect could only be read on-device. With a cloud API serving sleep,
+heart rate, HRV and SpO2 directly, **the nightly feed no longer requires a
+phone app at all** — it becomes another server-side adapter alongside Hevy and
+Withings, running in the same daily cron. See D14 and §4.2 for what survives
+of the Phase 3 app.
 
-**Watch8 Classic specifics (D3).** Samsung's guidance is that the watch must be worn to bed for at least 3–4 hours a night, on at least 3 of any 14 days, to activate sleep tracking and Vascular Load.
+**What it supplies.** Around 40 data types, including steps, heart rate,
+sleep with stages, weight, SpO2 and **heart-rate variability** as RMSSD or
+SDNN. Note the last one: HRV has been an open question since this plan was
+written (R4, §16) and has gated the readiness formula's HRV term. If the Air
+delivers it, `HRV_AVAILABLE` can finally be set true and the full formula
+(§6.3 w4) comes into play rather than the fallback.
 
-This makes S6 a hard requirement: **wear the watch overnight at least 5 nights a week for the 6-week baseline.** Sporadic wear does not merely reduce data volume, it corrupts baselines — if you only wear it on nights you sleep well, your baseline is biased and every deviation calculated against it is wrong.
+**Two things to verify before depending on any of it** — both are the kind of
+assumption that has already cost this project a working session when carried
+untested:
+
+1. **Restricted scopes and the seven-day token.** Every Google Health API
+   scope is classified *Restricted*, which means production access needs a
+   privacy and security review. An unreviewed app stays in *Testing* status,
+   and **in Testing status Google refresh tokens expire after seven days.**
+   For a daily cron that is a weekly silent breakage — precisely the failure
+   mode §4.3's dead-man's switch exists to catch, arriving every Monday. Find
+   out before building against it whether a single-user personal project can
+   be verified, or whether it lives with weekly re-consent. **This is the
+   single highest-risk unknown in the new arrangement.**
+
+2. **Whether third-party data reaches the cloud.** Google's own help pages say
+   that apps connected to Google Health *via Health Connect* sync their data
+   into the Google Health app, and Samsung Health has written to Health
+   Connect since v6.22.5 (October 2022). What is **not** confirmed anywhere
+   found is whether data that arrived that way is then served back out through
+   the Google Health *API*, as opposed to merely appearing in the app. Health
+   Connect itself has no cloud API, so the chain has one unverified link.
+
+**The architecture does not depend on that second answer, deliberately.** The
+Air records sleep, heart rate, HRV and SpO2 itself, so the ongoing feed is
+first-party data either way. Samsung Health's role is now **historical only**,
+and that history is already imported from the one-off export (§3.5). If
+Samsung data does also flow through, it is a bonus that closes the gap between
+the last export and the Air's first night; if it does not, nothing in the plan
+breaks. **Do not design anything that assumes it.**
+
+**Wear is still the constraint, and still the point.** S6 stands unchanged:
+the baseline needs consistent overnight wear, and sporadic wear does not
+merely thin the data, it biases it — measure only the nights you sleep well
+and every deviation is computed against a flattering baseline. The bet behind
+D14 is that a device that is easy to wear gets worn. That bet is testable:
+**the overnight wear rate over the first six weeks is the measurement that
+says whether the switch worked**, and the historical figure to beat is 23%
+(461 nights of 2,042, Feb 2021 – Sep 2026).
 
 ### 3.4 MyFitnessPal — the weak link
 
@@ -199,11 +289,20 @@ Three options, in order of preference:
 |---|---|---|
 | Hevy | API paging, one-off script | Full account history |
 | Withings | Date-ranged API queries | Full account history |
-| Samsung Health | **One-off manual export** from the Samsung Health app, parsed into `raw_records` | Potentially years |
+| Samsung Health | **One-off manual export**, parsed into `raw_records`. **Done 11 Sep 2026** | 461 nights, 1,950 days of steps, Feb 2021 – Sep 2026 |
+| Google Health | Date-ranged API queries once authorised. Depth unknown — the Air is new, so its own history starts at purchase | From first wear |
 | MyFitnessPal | One-off Premium CSV export (if pursued) | Full history |
 | Subjective | None — starts from day one | n/a |
 
-Run the Samsung Health manual export in Phase 0, before anything else. It costs ten minutes, and the parsed history is what lets your baselines be meaningful from week one rather than week six.
+Run the Samsung Health manual export in Phase 0, before anything else. It costs
+ten minutes, and the parsed history is what lets your baselines be meaningful
+from week one rather than week six. **Done 11 September 2026.**
+
+That export is now the *only* Samsung route (D14), which raises its stakes: it
+is a snapshot, and the window between the last export and the Air's first night
+is a gap nothing else fills. Take one final export when the Air arrives, and
+keep the file — re-running the importer is idempotent, so a later export
+simply extends the history rather than duplicating it.
 
 ---
 
@@ -211,13 +310,16 @@ Run the Samsung Health manual export in Phase 0, before anything else. It costs 
 
 ### 4.1 Overview
 
+Revised 15 September 2026 (D14). Every ongoing source is now a server-side
+pull: nothing has to run on a phone for the daily loop to work.
+
 ```
-Galaxy Watch8 ─┐  Withings ─┐  Hevy (cloud) ─┐  MyFitnessPal ─┐
-               │            │                │                │
-   PHONE: Samsung Health ──► Health Connect ◄─────────────────┘
-          Companion app reads HC on schedule (Phase 3)
-               │ HTTPS POST  │ OAuth2 pull   │ api-key pull
-               ▼             ▼               ▼
+Fitbit Air ──┐   Withings ──┐   Hevy (cloud) ──┐   MyFitnessPal ──┐
+             │              │                  │                  │
+   Google Health cloud      │                  │        (calories only,
+   health.googleapis.com    │                  │         Phase 3, §3.4)
+             │ OAuth2 pull  │ OAuth2 pull      │ api-key pull      │
+             ▼              ▼                  ▼                  ▼
    INGESTION LAYER — one adapter per source
    normalise → validate → idempotent upsert → raw_records retained
                ▼
@@ -642,7 +744,9 @@ decoration or for a chart series. This is what makes an amber ring legible as
 amber rather than as styling.
 
 Source provenance uses its own muted dots, never the status or accent hues:
-Samsung Health `#5B93D6`, Hevy `#D9803F`, Withings `#4FB3C4`, MyFitnessPal
+Google Health `#5B93D6` (inherits the Samsung Health slot; the historical
+Samsung rows keep it too, since they are the same measurements), Hevy
+`#D9803F`, Withings `#4FB3C4`, MyFitnessPal
 `#8AA83F`.
 
 #### 10.3.2 Type
@@ -775,7 +879,7 @@ Non-negotiable, and written into the system prompt:
 Each phase has an acceptance test. Do not start the next until the current one passes.
 
 ### Phase 0 — Setup
-- **Run the Samsung Health manual export now** and keep the file.
+- **Run the Samsung Health manual export now** and keep the file. *(Done 11 Sep 2026 — 461 nights back to Feb 2021. Take one more when the Air arrives, per §3.5.)*
 - Obtain: Hevy API key, Withings developer app + OAuth credentials, Supabase project, Fly.io/Vercel accounts, Claude API key, Resend key.
 - Repo skeleton (private), Alembic migrations, CI running tests, Healthchecks.io dead-man's switch.
 - Decide §3.4 — stay on MyFitnessPal or switch.
@@ -798,14 +902,38 @@ Each phase has an acceptance test. Do not start the next until the current one p
 - Supplement checklist seeded; protocol change log.
 - **Accept when:** you receive an accurate brief 7 days running and every number in it traces back to the input JSON.
 
-### Phase 3 — The app and Health Connect
-- Expo dev build with `react-native-health-connect`; permissions flow; background sync POSTing to your API.
-- EAS build → signed APK sideloaded.
-- Parse and ingest the Phase 0 Samsung Health export.
-- **Verify HRV and SpO2 availability** and finalise the readiness formula.
-- MyFitnessPal calories via Health Connect.
+### Phase 3 — The nightly feed
+
+**Restructured 15 September 2026 (D14).** This phase used to be "the app and
+Health Connect", and the app was on the critical path because Health Connect
+could only be read on-device. With the Google Health API that is no longer
+true, so the phase splits: the data half is server-side work that unblocks
+Phase 2's gate, and the app half becomes a UI project that can wait.
+
+**3a — the feed (the part that matters).**
+- Google Health API adapter: OAuth2 flow, token storage with rotation, daily
+  pull of sleep, resting HR, HRV, SpO2 and steps into the existing ingestion
+  layer. Same shape as the Hevy and Withings adapters; runs in the same cron.
+- **Settle the restricted-scope question first** (§3.3). If a single-user
+  project cannot be verified and refresh tokens expire every seven days, that
+  changes the design before a line is written — not after.
+- **Verify HRV and SpO2 actually arrive**, and set `HRV_AVAILABLE`
+  accordingly. This has been open since the plan was written (R4).
+- Take a final Samsung Health export when the Air arrives, to close the gap
+  between the last one and the Air's first night.
+- **Accept when:** sleep, resting HR and steps land automatically for 7
+  consecutive days with zero manual intervention.
+
+**3b — the app (no longer blocking).**
+- Expo dev build, EAS build → signed APK sideloaded.
 - `expo-notifications` replaces email delivery.
-- **Accept when:** sleep, resting HR and steps land automatically for 7 consecutive days with zero manual intervention, and the brief arrives as a push notification.
+- MyFitnessPal calories, which still need Health Connect and therefore still
+  need something on the phone (§3.4) — this is now the *only* remaining reason
+  the app exists as a data path rather than a UI.
+- **Accept when:** the brief arrives as a push notification.
+
+Doing 3a alone gets the nightly feed working and Phase 2's gate reachable. 3b
+is a better phone experience and nothing depends on it.
 
 ### Phase 4 — Full metrics and dashboard
 - Readiness score with component breakdown and wear-bias guard.
@@ -964,7 +1092,7 @@ than acted on.
 | R1 | **Check-in adherence collapses after the novelty** | High | Fatal | Sub-30-second design, pre-filled defaults, streaks, one-tap deep link. Below 60% over two weeks is a design failure requiring redesign, not more discipline. |
 | R2 | **Overnight watch wear is inconsistent (D3)** | High | High | Wear-bias guard on baselines; `no_watch` tag; `insufficient_data` rather than a fabricated score. |
 | R3 | Protein data unavailable on MyFitnessPal | High | Medium | Decide §3.4 before Phase 3; nulls propagate honestly to the brief's caveats |
-| R4 | HRV/SpO2 unavailable via Health Connect | Medium | Medium | Verify in Phase 3; fallback readiness formula ready |
+| R4 | HRV/SpO2 unavailable | **Low** (was Medium) | Medium | The Google Health API lists HRV as RMSSD/SDNN and SpO2 among its types (§3.3), so D14 probably closes this. Still verify against real responses before `HRV_AVAILABLE` is set; the fallback formula stays ready |
 | R5 | AI produces confident nonsense and you stop trusting it | Medium | High | Phase-locked language, no-arithmetic rule, mandatory confidence, eval set |
 | R6 | Silent ingestion failure | High | Medium | Dead-man's switch, Data Health screen, brief states its own completeness |
 | R7 | Scope creep stalls the project before v1 ships | High | High | Phase gates with acceptance tests; nothing from a later phase starts early |
@@ -973,7 +1101,9 @@ than acted on.
 | R10 | Withings refresh-token rotation silently breaks sync | Medium | Medium | Persist the new refresh token on every refresh; dead-man's switch catches it within a day |
 | R11 | Health data exposure | Low | Severe | §13 in full |
 | R12 | Timezone / sleep-boundary bugs corrupt joins | Medium | Medium | "Sleep belongs to the day it ends", unit-tested including BST/GMT transitions |
-| R13 | Health Connect permissions prove restrictive | Low | Medium | Health Sync + Google Drive CSV documented as fallback (§3.3) |
+| R13 | ~~Health Connect permissions prove restrictive~~ | — | — | Largely moot under D14: the primary path no longer reads Health Connect. Still applies to MyFitnessPal calories (§3.4), which remain the one thing needing on-device access |
+| R14 | **Google Health API restricted scopes cannot be verified for a single-user project** | Medium | **High** | An unverified app stays in Testing, where refresh tokens expire every 7 days — a weekly silent breakage on a daily cron. Settle before building (§3.3). If unavoidable: the dead-man's switch (§4.3) catches it, and a weekly manual re-consent is survivable but grim. Escalation is to reconsider the device |
+| R15 | Samsung history stops at the last export and the Air's history starts at purchase | High | Low | Accepted. Take a final export when the Air arrives (§3.5); the importer is idempotent so a later export extends rather than duplicates. A gap of days in five years of history is not worth engineering around |
 
 ---
 
@@ -993,7 +1123,17 @@ than acted on.
 
 Researched 3 September 2026. Re-verify at implementation. Specifically unconfirmed and requiring empirical test:
 
-- Whether HRV, SpO2 and body composition reach Health Connect from Samsung Health on the Watch8 Classic.
+- **Whether a single-user project can clear restricted-scope verification for
+  the Google Health API**, or whether it lives with seven-day refresh tokens.
+  The highest-risk unknown in the plan (R14) and the one to answer first.
+- **Whether the Google Health API serves third-party data** that reached the
+  Google Health app via Health Connect, or only first-party Fitbit/Google
+  device data. Nothing is designed to depend on the answer (§3.3), but it
+  decides whether the Samsung gap closes itself.
+- Whether HRV and SpO2 arrive in practice from the Fitbit Air. The API lists
+  both; that is not the same as seeing them in a real response.
+- ~~Whether HRV, SpO2 and body composition reach Health Connect from Samsung
+  Health on the Watch8 Classic.~~ Moot under D14.
 - Exactly which nutrition fields MyFitnessPal writes to Health Connect beyond calorie meal summaries and water.
 - Current Hevy API rate limits (undocumented).
 - Current free-tier limits for Supabase, Vercel, Fly.io, Resend and Healthchecks.
@@ -1005,7 +1145,23 @@ Researched 3 September 2026. Re-verify at implementation. Specifically unconfirm
 - [Hevy API key setup and Pro requirement](https://docs.serval.com/sections/integrations/hevy)
 - [Withings Public Health Data API — FAQ](https://developer.withings.com/developer-guide/v3/integration-guide/public-health-data-api/faq/)
 - [Withings API plans — free tier limits](https://developer.withings.com/developer-guide/v3/withings-solutions/withings-api-plans)
+**For D14 (added 15 September 2026).** These were read via search result
+summaries, not fetched in full — `developers.google.com` and
+`support.google.com` are both blocked by this environment's egress proxy — so
+the API details below are second-hand and carry the caveat in §3.3.
+
+- [Google Health API — get started](https://developers.google.com/health/get-started)
+- [Google Health API — about](https://developers.google.com/health/about)
+- [Google Health API — sleep data types](https://developers.google.com/health/data-types/sleep)
+- [Google Health API — vitals and health metrics](https://developers.google.com/health/data-types/vitals)
+- [Google Health API — migration from the Fitbit Web API](https://developers.google.com/health/migration/api-specifications)
+- [Google — restricted scope verification](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification)
+- [Google — introducing the Fitbit Air](https://blog.google/products-and-platforms/devices/fitbit/fitbit-air/)
+- [Google Health — connect third-party devices and apps](https://support.google.com/googlehealth/answer/14236613)
+- [google-health-cli — command-line client for the API](https://github.com/Google-Health-API/google-health-cli)
+
 - [Samsung — Health Connect FAQ, synced data types](https://developer.samsung.com/health/health-connect-faq.html)
+- [Samsung — accessing Samsung Health data through Health Connect](https://developer.samsung.com/health/blog/en/accessing-samsung-health-data-through-health-connect)
 - [Samsung — Health features on the Galaxy Watch8 and Watch8 Classic](https://www.samsung.com/uk/support/mobile-devices/health-features-on-the-galaxy-watch8-and-watch8-classic/)
 - [Android — Health Connect comparison guide](https://developer.android.com/health-and-fitness/health-connect/comparison-guide)
 - [react-native-health-connect](https://www.npmjs.com/package/react-native-health-connect)
