@@ -65,9 +65,21 @@ reportable sleep baseline on 2.8% of days; the adaptive one gives 69.9%. Same
 fourteen real observations, no interpolation — it just stops demanding they be
 recent, and reports the span it used.
 
-The import covers *history*. The nightly feed still needs the Phase 3
-companion app (outstanding A3), so sleep stops at the date of the last
-export.
+**Samsung Health is historical only as of 15 Sep 2026 (plan D14).** The
+overnight sensor becomes a **Fitbit Air**, and sleep, resting HR, HRV and SpO2
+will arrive over the **Google Health API** (`health.googleapis.com/v4/`,
+Google OAuth2) — a cloud endpoint, which Health Connect never had. That takes
+the companion app off the critical path: the nightly feed becomes a
+server-side adapter like Hevy's, not a phone app.
+
+Two unknowns gate it, and the first is serious: **every Google Health API
+scope is Restricted**, and an unverified app stays in Testing where refresh
+tokens expire after seven days — a weekly silent break on a daily cron
+(plan R14). Settle that before building. Second, it is unconfirmed whether the
+API serves third-party data that reached Google Health via Health Connect;
+nothing is designed to depend on it.
+
+Until that adapter exists, sleep stops at the date of the last export.
 
 Phase 2's *gate* is not met and cannot be met by writing code: it needs seven
 consecutive days of an accurate brief against real data. Same for Phase 1's

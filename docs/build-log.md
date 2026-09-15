@@ -6,6 +6,82 @@ of each working session.
 
 ---
 
+## 15 September 2026 — the device changed, and took the hardest phase with it
+
+A spec change, no code. The overnight sensor becomes a **Fitbit Air**, and the
+consequence is larger than swapping one device for another: it removes the
+biggest unbuilt piece of the plan.
+
+### Why it matters more than a device swap
+
+§3.3 has said since the plan was written that **Health Connect is an on-device
+API with no cloud endpoint**, and the entire Phase 3 companion app existed to
+work around that one sentence. An Expo dev build, a config plugin, a
+background sync, an EAS signing chain — all of it to get sleep off a phone.
+
+The Fitbit app became **Google Health** in May 2026, and the Fitbit Web API —
+sunsetting *this month* — is replaced by the **Google Health API** at
+`health.googleapis.com/v4/` on standard Google OAuth2. That is a real cloud
+endpoint, so the nightly feed becomes another server-side adapter next to Hevy
+and Withings, running in the same cron.
+
+Phase 3 therefore splits. **3a is the feed**: an adapter, a token flow, and
+Phase 2's gate becomes reachable. **3b is the app**: push notifications and a
+nicer UI, and nothing depends on it. MyFitnessPal calories are now the only
+data path still needing something on the phone.
+
+### The reason for the device is wear, not sensors
+
+The plan already knew its own weak point — "overnight wear becomes a hard
+requirement" — and the measured answer came back at **23%**: 461 nights out of
+2,042. That number is what forced the readiness rework a day earlier, and no
+formula fixes it. A 12g screenless pebble is a different proposition from a
+Classic watch at bedtime.
+
+So D14 is a bet, and it is written into the plan as a testable one: **the
+overnight wear rate over the first six weeks says whether the switch worked**,
+against a historical figure of 23%.
+
+### What the research actually settled, and what it did not
+
+The Air, the rename and the API are all confirmed. HRV is listed as RMSSD or
+SDNN among roughly 40 data types, which probably closes **R4** — open since
+the plan was written and the reason the readiness formula has an unused HRV
+term. R4 drops from Medium to Low, but `HRV_AVAILABLE` stays false until a
+real response shows it, because a docs listing is not a measurement.
+
+Two things did not settle, and both are written down as unknowns rather than
+smoothed over.
+
+**R14, the serious one.** Every Google Health API scope is *Restricted*, which
+needs a privacy and security review for production. An unverified app stays in
+Testing status, and **in Testing, Google refresh tokens expire after seven
+days.** On a daily cron that is a weekly silent breakage — exactly what §4.3's
+dead-man's switch exists to catch, arriving every Monday. Whether a
+single-user personal project can be verified is unknown, and it is the first
+question to answer, before a line of adapter code.
+
+**Whether third-party data reaches the cloud API.** Google's help pages say
+apps connected via Health Connect sync into the Google Health *app*; nothing
+found says that data is served back out of the *API*. Health Connect has no
+cloud API of its own, so the chain has one unverified link.
+
+The architecture is deliberately arranged so the second answer does not matter:
+the Air records sleep, HR, HRV and SpO2 itself, so the feed is first-party
+either way. **Samsung Health becomes historical only** — the export already
+imported is the archive, and nothing is designed to assume more.
+
+### Caveat on the sources
+
+`developers.google.com` and `support.google.com` are both blocked by this
+environment's egress proxy, so the API details came from search-result
+summaries rather than fetched pages. Appendix B says so next to the links.
+Everything specific enough to build against — scopes, token lifetimes, data
+types — should be confirmed against the real documentation before it is
+trusted.
+
+---
+
 ## 14 September 2026 — the score that was best when it knew least
 
 A review on the 11th went looking for improvements and found a bug instead:
