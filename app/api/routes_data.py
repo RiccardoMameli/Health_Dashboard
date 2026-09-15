@@ -115,6 +115,14 @@ def today(session: Session = Depends(db)) -> dict:
         "sleep": {
             "duration_min": computed.sleep_duration_min,
             "baseline_min": (computed.sleep_baseline.median if computed.sleep_baseline else None),
+            # How many nights the baseline stands on and how far back they
+            # reach. With the window widened to 180 days a comparison can rest
+            # on nights from months ago, and a screen that shows the deviation
+            # without showing its age is overstating what it knows.
+            "baseline_nights": (computed.sleep_baseline.n if computed.sleep_baseline else None),
+            "baseline_span_days": (
+                computed.sleep_baseline.span_days if computed.sleep_baseline else None
+            ),
             "debt_14d_min": computed.sleep_debt_14d_min,
         },
         "resting_hr": {
