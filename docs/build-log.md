@@ -18,22 +18,50 @@ before.
 
 I claimed the adaptive window would take sleep-baseline availability from 2.8%
 of days to **69.9%**. Measured over all 2,041 days: **30.8%**. The 30-day
-window alone gives 19.5%, so the widening bought about eleven points, not
+window alone gives **27.4%**, so the widening bought **+3.4 points**, not
 sixty-seven.
+
+*(Corrected later the same day. The first write-up of this entry said the
+30-day figure was 19.5% and that reaching past 90 days bought nothing. Both
+came from an 87-day synthetic database and were published as measurements of
+his history — the same mistake as the 69.9%, made while correcting the 69.9%.
+See below.)*
 
 The tell was in the run's own output — the reportable baselines reach back a
 **median of 30 days**, meaning most came from the preferred window and the
-widening rarely fired at all. Extending the cap to 180 or 365 days returns
-*exactly the same* 30.8%, which says it plainly: outside his dense stretches
-even a year does not hold 14 nights, and inside them 30 days already did.
+widening rarely fired at all.
+
+What reaching further would buy, measured against his real history rather than
+guessed at:
+
+    30-day window only        559 days   27.4%
+    prefer 30, widen to 90    629 days   30.8%   <- current
+    prefer 30, widen to 180   736 days   36.1%
+    prefer 30, widen to 365   942 days   46.2%
+
+So it keeps paying, and a year-long cap would nearly double the plain 30-day
+figure. That is now an **open decision** rather than a settled one, because
+coverage is not the only question: the days a wider cap adds are exactly the
+ones whose nearest fourteen nights are months old, and a deviation measured
+against a stale median is a weaker claim than one measured against a current
+one. The script gained two measurements to settle it — the median span each
+rule actually produces, and whether his sleep norm drifts from year to year.
+If the norm is stable a year-old median is a fair comparator; if it drifts, a
+wide window measures the drift rather than last night.
 
 The error was in the model, not the code. I modelled his wear as evenly spaced
 clusters; the real pattern is dense streaks separated by long dead periods.
-The change is still worth keeping — 19.5% to 30.8% is a real improvement on
-the thing that was blocking five years of history — but the figure had been
-quoted in `CLAUDE.md`, the plan's D13 and the module's own comment before
-anyone measured it. All three now carry the measured number and the reason the
-estimate was wrong.
+The change is worth keeping, but only just: 27.4% to 30.8% is a smaller
+improvement than any figure previously attached to it.
+
+**Three wrong numbers have now been published about this one constant, and all
+three came from estimating instead of measuring.** 69.9% came from a model of
+his wear pattern. Then 19.5% and "widening past 90 buys nothing" were written
+into `CLAUDE.md`, the plan's D13, the module comment and this log as
+measurements — while correcting the first one — when they had actually come
+from the 87-day synthetic database used to smoke-test the script. The real
+numbers are above. `CLAUDE.md` now carries an instruction not to quote a
+coverage figure for this that did not come from a run against his database.
 
 The script gained a `compare_windows` pass so this is a measurement next time
 rather than an argument: it applies every candidate rule to the same series
@@ -67,6 +95,12 @@ the same logic in reverse — a saturated sleep debt is bad news whoever reports
 it, and the cap only ever moves a day down.
 
 Four tests cover it, two of which fail against the previous code.
+
+**Measured after the fact:** green fell from 247 days to 114 and amber rose
+from 370 to 503, so 133 days changed colour — slightly more than the 113 that
+sat exactly on neutral, because one-sided days scoring between 65 and 75 were
+green too. Red is unchanged at 135, as intended: the cap only ever moves a day
+down.
 
 ### And one thing I had got wrong the other way
 
