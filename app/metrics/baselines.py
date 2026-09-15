@@ -34,23 +34,30 @@ BASELINE_WINDOW_DAYS = 30
 #: observations inside any 30 days needs 47% wear sustained across that
 #: window.
 #:
-#: **Measured over the whole history on 15 Sep 2026** (`verify_readiness.py`):
-#: the 30-day window alone gives a reportable sleep baseline on 19.5% of days;
-#: preferring 30 and widening to 90 gives **30.8%**. Widening further does not
-#: help — 180 and 365 day caps return the same figure, because outside his
-#: dense stretches even a year does not contain 14 nights, and inside them 30
-#: days already did.
+#: **Measured over the whole history** (`scripts/verify_readiness.py`, run
+#: 15 Sep 2026 against 2,041 days):
 #:
-#: That is a real improvement and worth keeping, but it is a third of what was
-#: predicted when this was written. The estimate of 69.9% came from modelling
-#: his wear as evenly-spaced clusters; the real pattern is dense streaks
-#: separated by long dead periods, which the model did not capture. Recorded
-#: because the number was quoted in three places before anyone measured it.
+#:     30-day window only        559 days   27.4%
+#:     prefer 30, widen to 90    629 days   30.8%   <- this constant
+#:     prefer 30, widen to 180   736 days   36.1%
+#:     prefer 30, widen to 365   942 days   46.2%
 #:
-#: The cost is smaller than feared too: `span_days` reports how far back the
-#: observations reach, and the real median is 30 days, not the 62 estimated —
-#: most baselines come from the preferred window and the widening fires on a
-#: minority.
+#: So widening to 90 buys **+3.4 points**, and reaching further keeps paying —
+#: a year-long cap would nearly double the 30-day figure. Whether that is
+#: worth taking is a question about what a baseline is *for*, not about
+#: coverage: the days it would add are precisely the ones where the nearest
+#: fourteen nights are months old, and a deviation measured against a stale
+#: median is a weaker claim than one measured against a current median.
+#: Deliberately left at 90 pending that decision; `span_days` reports the real
+#: reach of every baseline so the cost is visible rather than assumed.
+#:
+#: This constant has now attracted three wrong numbers, all from estimating
+#: instead of measuring. It was predicted to lift coverage to 69.9% — that
+#: came from modelling his wear as evenly spaced clusters, where the real
+#: pattern is dense streaks separated by long dead periods. Then 19.5% and
+#: "widening past 90 buys nothing" were published as measurements when both
+#: came from an 87-day synthetic database. The numbers above are from his
+#: real history and nothing else.
 BASELINE_MAX_WINDOW_DAYS = 90
 
 #: Wear-bias guard (D3): fewer than this many nights worn in any rolling 7

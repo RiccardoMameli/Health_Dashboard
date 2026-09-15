@@ -60,12 +60,17 @@ stops being opened. Every partial score carries its coverage and a sentence
 naming what it rests on.
 
 **Baselines prefer 30 days and widen to 90 when too sparse.** Measured over
-the whole history on 15 Sep 2026 (`scripts/verify_readiness.py`): 30 days
-alone gives a reportable sleep baseline on 19.5% of days, the adaptive rule
-gives **30.8%**. Widening past 90 buys nothing — 180 and 365 return the same
-figure. Worth keeping, but a third of the 69.9% predicted before it was
-measured; that estimate modelled evenly-spaced wear and the real pattern is
-dense streaks separated by long gaps.
+all 2,041 days (`scripts/verify_readiness.py`): 30 days alone gives a
+reportable sleep baseline on **27.4%** of days, widening to 90 gives
+**30.8%** — so the adaptive rule buys +3.4 points. Reaching further keeps
+paying (180 → 36.1%, 365 → 46.2%), and whether to take that is **an open
+decision**: the days it adds are the ones whose nearest fourteen nights are
+months old. Left at 90 for now.
+
+Do not quote a coverage figure for this that did not come from a run against
+his database. Three wrong ones have been published already — 69.9% from a
+model, then 19.5% and "widening past 90 buys nothing" from an 87-day
+synthetic fixture.
 
 **Consequence: most days still cannot be scored.** 752 of 2,041 days score,
 1,289 refuse at 0% coverage.

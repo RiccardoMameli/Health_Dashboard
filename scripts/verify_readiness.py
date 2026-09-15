@@ -106,28 +106,61 @@ def compare_windows(session, first: Date, last: Date) -> None:
     series = [by_date.get(first + timedelta(days=i)) for i in range(span)]
 
     results = {}
+    print(f"  {'rule':<26} {'days':>6}  {'cover':>6}  {'median span':>12}")
     for label, preferred, longest in (
         ("30-day window only", 30, 30),
         ("prefer 30, widen to 90", 30, BASELINE_MAX_WINDOW_DAYS),
         ("prefer 30, widen to 180", 30, 180),
         ("prefer 30, widen to 365", 30, 365),
     ):
-        usable = 0
+        usable, spans = 0, []
         for end in range(span):
             window = series[max(0, end - longest + 1) : end + 1]
             base = rolling_baseline(window, preferred_days=preferred, max_days=longest)
             if base.reportable:
                 usable += 1
+                spans.append(base.span_days)
         results[label] = usable / span * 100
-        print(f"  {label:<26} {usable:>6,} days   {results[label]:5.1f}%")
+        spans.sort()
+        median_span = spans[len(spans) // 2] if spans else 0
+        print(f"  {label:<26} {usable:>6,}  {results[label]:5.1f}%  "
+              f"{median_span:>9} days")
 
     gain = results["prefer 30, widen to 90"] - results["30-day window only"]
-    print(f"\n  the widening to 90 days bought {gain:+.1f} percentage points")
-    if gain < 5:
-        print("  -> it is doing almost nothing. Outside his dense stretches even 90")
-        print("     days does not hold 14 nights, and inside them 30 already did.")
-    print("  the longer windows above say whether reaching further would help,")
-    print("  and at what cost: a baseline is only as useful as it is current.")
+    print(f"\n  widening to 90 buys {gain:+.1f} points over a plain 30-day window")
+    print("  the rows below it say what reaching further would buy, and the span")
+    print("  column says what it costs: those extra days are the ones whose")
+    print("  nearest fourteen nights are months old")
+
+    # Whether a wide window is *safe* is a different question from whether it
+    # is available, and it has an answer in the data: if the sleep norm barely
+    # moves from year to year then a year-old median is a fair comparator, and
+    # if it drifts then reaching back that far measures the drift rather than
+    # last night.
+    print("\n  is a wide window safe? — sleep median by calendar year:")
+    by_year: dict[int, list[float]] = {}
+    for day, duration in by_date.items():
+        by_year.setdefault(day.year, []).append(duration)
+    yearly = []
+    for year in sorted(by_year):
+        values = sorted(by_year[year])
+        if len(values) < 14:
+            print(f"    {year}   {len(values):>4} nights   (too few to say)")
+            continue
+        median = values[len(values) // 2]
+        yearly.append(median)
+        print(f"    {year}   {len(values):>4} nights   median {median:6.0f} min "
+              f"({median / 60:.1f}h)")
+    if len(yearly) >= 2:
+        drift = max(yearly) - min(yearly)
+        print(f"\n    spread across years: {drift:.0f} min")
+        if drift <= 20:
+            print("    -> stable. A baseline reaching back a year would compare him")
+            print("       against much the same norm, so a wider cap looks safe.")
+        else:
+            print("    -> it drifts. A year-long window would partly be measuring")
+            print("       that drift rather than last night, which argues for")
+            print("       keeping the cap short even at the cost of coverage.")
 
 
 def main() -> int:
@@ -263,8 +296,9 @@ def main() -> int:
             if clamped_high > scored * 0.05:
                 print("  ! more than 5% pinned at 100 — the top of the scale is compressed")
             if exactly_neutral > scored * 0.10:
-                print("  ! a pile-up on the neutral score usually means components are")
-                print("    available but all reading zero, which is worth a look")
+                print("    (expected: these are days carried by sleep debt and ACWR with")
+                print("     nothing to penalise. They read amber, not green, since the")
+                print("     band cap — an absence of penalties is not a good morning)")
 
         section("how much of the picture each day had")
         coverages.sort()

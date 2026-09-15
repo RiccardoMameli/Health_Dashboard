@@ -24,7 +24,7 @@
 | D10 | Access model | **Cheapest and fastest** | No custom domain, no public registration. Single-user magic-link auth on free hosting tiers. See §13. |
 | D11 | Load basis when RPE is absent | **Volume-derived, labelled** | Recorded 10 Sep 2026. Volume tracks exercise selection more than stress, so the basis is carried with the figure and mixed windows are refused — see §6.2. |
 | D12 | Readiness formula | **A mean over what was measured, not a deduction from 100** | Changed 14 Sep 2026, departing from §6.3. The old formula scored a day best when it knew least. Coverage replaces completeness as the gate — see §6.3. |
-| D13 | Baseline window | **Prefer 30 days, widen to 90 when sparse** | Changed 14 Sep 2026; **measured 15 Sep**. 30 days alone gives a usable sleep baseline on 19.5% of real days, the adaptive rule 30.8%. Widening past 90 buys nothing. The 69.9% predicted beforehand was a modelling error. |
+| D13 | Baseline window | **Prefer 30 days, widen to 90 when sparse** | Changed 14 Sep 2026; measured 15 Sep over 2,041 days. 30 days alone 27.4%, widen-to-90 30.8%, 180 36.1%, 365 46.2%. **Whether to reach past 90 is open** — the days it adds have baselines months old. |
 | D14 | Overnight sensor and its API | **Fitbit Air + Google Health API**, replacing Galaxy Watch8 + Health Connect | Decided 15 Sep 2026. A cloud API removes the companion app from the critical path and may finally supply HRV. Two unknowns gate it — restricted-scope verification and third-party data provenance. See §3.3. |
 
 ### 0.1 What changed from v0.1
