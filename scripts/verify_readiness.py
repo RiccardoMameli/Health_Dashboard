@@ -36,7 +36,9 @@ from sqlalchemy import func, select  # noqa: E402
 
 from app.db import session_scope  # noqa: E402
 from app.metrics.baselines import (  # noqa: E402
+    BASELINE_MAX_WINDOW_DAYS,
     STATUS_POTENTIALLY_BIASED,
+    rolling_baseline,
 )
 from app.metrics.readiness import (  # noqa: E402
     MIN_COVERAGE_PCT,
@@ -79,6 +81,55 @@ def histogram(counts: Counter, order: list[str], total: int) -> None:
         print(f"  {key:<20} {n:>6,}  {n / total * 100 if total else 0:5.1f}%  {bar(n, total)}")
 
 
+def compare_windows(session, first: Date, last: Date) -> None:
+    """What the widening actually bought, measured rather than modelled.
+
+    Reads only the sleep table and applies both rules to the same series, so
+    it costs nothing next to the full walk and answers the question the walk
+    raises: the baselines it reports reach back a median of 30 days, which
+    means most of them came from the preferred window and the widening never
+    fired. That is worth a number rather than an inference.
+    """
+    section("what widening the baseline window actually bought")
+    rows = session.execute(
+        select(SleepSession.date, SleepSession.duration_min)
+        .where(SleepSession.duration_min.is_not(None))
+        .order_by(SleepSession.date)
+    ).all()
+    by_date: dict[Date, float] = {}
+    for day, duration in rows:
+        # The engine takes the longest session per date; for a coverage count
+        # any one of them is enough to make the night an observation.
+        by_date.setdefault(day, float(duration))
+
+    span = (last - first).days + 1
+    series = [by_date.get(first + timedelta(days=i)) for i in range(span)]
+
+    results = {}
+    for label, preferred, longest in (
+        ("30-day window only", 30, 30),
+        ("prefer 30, widen to 90", 30, BASELINE_MAX_WINDOW_DAYS),
+        ("prefer 30, widen to 180", 30, 180),
+        ("prefer 30, widen to 365", 30, 365),
+    ):
+        usable = 0
+        for end in range(span):
+            window = series[max(0, end - longest + 1) : end + 1]
+            base = rolling_baseline(window, preferred_days=preferred, max_days=longest)
+            if base.reportable:
+                usable += 1
+        results[label] = usable / span * 100
+        print(f"  {label:<26} {usable:>6,} days   {results[label]:5.1f}%")
+
+    gain = results["prefer 30, widen to 90"] - results["30-day window only"]
+    print(f"\n  the widening to 90 days bought {gain:+.1f} percentage points")
+    if gain < 5:
+        print("  -> it is doing almost nothing. Outside his dense stretches even 90")
+        print("     days does not hold 14 nights, and inside them 30 already did.")
+    print("  the longer windows above say whether reaching further would help,")
+    print("  and at what cost: a baseline is only as useful as it is current.")
+
+
 def main() -> int:
     # The console this runs on is Windows and defaults to cp1252. Two separate
     # scripts in this project have already died printing a box character.
@@ -109,6 +160,8 @@ def main() -> int:
         print(f"walking       : {len(days):,} days from {start}"
               f"{'' if args.stride == 1 else f', every {args.stride}'}")
         print("this recomputes every metric per day and is not fast; progress below")
+
+        compare_windows(session, first, last)
 
         scores: list[float] = []
         coverages: list[float] = []

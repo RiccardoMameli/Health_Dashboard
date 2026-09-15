@@ -8,7 +8,7 @@ that the decision to skip it stays visible instead of evaporating.
 Distinct from `outstanding.md`, which tracks work that is *going* to happen and
 is blocked on something. This is the maybe pile.
 
-**Last reviewed: 14 September 2026.**
+**Last reviewed: 15 September 2026** (after the readiness verification sweep).
 
 ---
 
@@ -38,19 +38,51 @@ is blocked on something. This is the maybe pile.
   role than they had as deduction sizes. Worth revisiting once there is enough
   history to check scores against how days actually felt.
 
-- **A 90-day baseline responds slowly.** At 23% wear the observations behind a
-  baseline span a median of 62 days, so a genuine change in sleep takes about
-  two months to move the median it is measured against. `span_days` is
-  reported for exactly this reason, but nothing on the screen shows it yet.
+- **A 90-day baseline responds slowly** — but measurement on 15 Sep says this
+  worry was misplaced. The real median span is **30 days**, not 62: most
+  reportable baselines come from the preferred window, and the widening fires
+  on a minority. `span_days` is still unshown on any screen.
 
-- **`potentially_biased` is now the normal state, not the exception.** At this
-  wear rate almost every sleep baseline will carry the flag. A warning that
-  fires constantly is a warning nobody reads; it may need to become a
-  quantity ("14 nights across 62 days") rather than a flag.
+- ~~**`potentially_biased` is now the normal state, not the exception.**~~
+  **Measured 15 Sep against the real history: 425 biased against 204 ok, so
+  67.6% — not the ~100% a synthetic run suggested.** The flag does carry
+  information. Leave it alone. Recorded because the synthetic inference was
+  wrong and the correction is worth more than the original note.
+
+---
+
+## Open after the 15 Sep verification sweep
+
+- **Nearly half of scored days can only report neutral-or-worse.** 352 of 752
+  scored days (47%) had no component available except sleep debt and ACWR,
+  both of which are penalties with no credit: there is no such thing as less
+  than no sleep debt. Those days have the neutral score as a *ceiling*. A
+  further 113 land exactly on neutral and read green, where what is actually
+  being said is "nothing adverse is visible", which is not the same as "this
+  was a good morning". The median score of 56.2 is partly an artefact of which
+  components happened to be available. **The candidate fix is to cap the band
+  at amber when no two-sided component is available** — green should mean
+  measured and good, not an absence of penalties. Not done: it is a scoring
+  decision and the owner has wanted a say in those.
+
+- **The 10% coverage floor never fires.** Zero days across five years were
+  refused with partial coverage below it; every refusal was at 0% coverage.
+  The constant is currently decorative. Harmless, but it means the floor is
+  not doing the job it was reasoned about, and a future change to the weights
+  could silently make it bite.
 
 ---
 
 ## Answered, kept for the record
+
+- **Did widening the baseline window to 90 days work?** Partly. It was
+  predicted to take sleep-baseline availability from 2.8% to 69.9% of days;
+  measured against the real history on 15 Sep it gives **30.8%**. The
+  prediction came from a model of his wear pattern that got the cluster
+  structure wrong — real wear is dense streaks separated by long dead periods,
+  and outside a streak even 90 days does not hold 14 nights. The change is a
+  real improvement and is keeping, but the figure quoted in CLAUDE.md and the
+  build log was wrong and is corrected.
 
 - **Does the readiness score need extrapolating when data is thin?** No.
   Renormalising the weights and taking a weighted mean are the same equation,

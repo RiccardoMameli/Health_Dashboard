@@ -6,6 +6,75 @@ of each working session.
 
 ---
 
+## 15 September 2026 (later) — the prediction was a third right
+
+`scripts/verify_readiness.py` walks every day of the imported history and
+recomputes the score, because the 14 Sep rework had only ever run against
+fixtures and a synthetic export. It found one wrong number of mine, one real
+design problem, and corrected a second wrong number I had written down the day
+before.
+
+### The baseline prediction was wrong
+
+I claimed the adaptive window would take sleep-baseline availability from 2.8%
+of days to **69.9%**. Measured over all 2,041 days: **30.8%**. The 30-day
+window alone gives 19.5%, so the widening bought about eleven points, not
+sixty-seven.
+
+The tell was in the run's own output — the reportable baselines reach back a
+**median of 30 days**, meaning most came from the preferred window and the
+widening rarely fired at all. Extending the cap to 180 or 365 days returns
+*exactly the same* 30.8%, which says it plainly: outside his dense stretches
+even a year does not hold 14 nights, and inside them 30 days already did.
+
+The error was in the model, not the code. I modelled his wear as evenly spaced
+clusters; the real pattern is dense streaks separated by long dead periods.
+The change is still worth keeping — 19.5% to 30.8% is a real improvement on
+the thing that was blocking five years of history — but the figure had been
+quoted in `CLAUDE.md`, the plan's D13 and the module's own comment before
+anyone measured it. All three now carry the measured number and the reason the
+estimate was wrong.
+
+The script gained a `compare_windows` pass so this is a measurement next time
+rather than an argument: it applies every candidate rule to the same series
+and prints what each would give.
+
+### Nearly half the scored days can only go down
+
+752 days score, 1,289 refuse at zero coverage. Of the 752, **352 — 47% — have
+no component available except sleep debt and ACWR.** Both are penalties with
+no credit; there is no such thing as less than no sleep debt. Those days have
+the neutral score as a *ceiling* and can only report neutral-or-worse however
+well the morning went.
+
+A further **113 land exactly on neutral and read green**, where what is
+actually being said is "nothing adverse is visible" — which is not the same
+claim as "this was a good morning" and should not wear the same colour.
+
+So the median score of 56.2 is partly an artefact of which components happened
+to be available rather than of how he was doing. The candidate fix is small:
+cap the band at amber when no two-sided component is available, so green means
+measured and good rather than an absence of penalties. Not done — it is a
+scoring decision and he has wanted a say in those both times so far.
+
+### And one thing I had got wrong the other way
+
+The synthetic dry run showed 38 of 38 baselines flagged `potentially_biased`,
+and I wrote in `comments-to-revisit.md` that a warning firing on every baseline
+carries no information. The real history says 425 biased against 204 ok —
+67.6%, not 100%. The flag does discriminate. The note is corrected rather than
+deleted, because the synthetic inference being wrong is the more useful record.
+
+### What came back clean
+
+No score clamped at either end, so the scale has room at both ends. No day
+refused with partial coverage under the 10% floor — every refusal was at zero.
+That last one is worth noting for a different reason: **the coverage floor
+never actually fires**, so the constant is currently decorative. Harmless now,
+but a future change to the weights could silently make it bite.
+
+---
+
 ## 15 September 2026 — the device changed, and took the hardest phase with it
 
 A spec change, no code. The overnight sensor becomes a **Fitbit Air**, and the

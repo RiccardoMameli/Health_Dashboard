@@ -59,11 +59,18 @@ watch every night and a dashboard that goes blank when he forgets is one that
 stops being opened. Every partial score carries its coverage and a sentence
 naming what it rests on.
 
-**Baselines prefer 30 days and widen to 90 when too sparse.** At his real wear
-rate (461 nights across 2,042 days) a fixed 30-day window produced a
-reportable sleep baseline on 2.8% of days; the adaptive one gives 69.9%. Same
-fourteen real observations, no interpolation — it just stops demanding they be
-recent, and reports the span it used.
+**Baselines prefer 30 days and widen to 90 when too sparse.** Measured over
+the whole history on 15 Sep 2026 (`scripts/verify_readiness.py`): 30 days
+alone gives a reportable sleep baseline on 19.5% of days, the adaptive rule
+gives **30.8%**. Widening past 90 buys nothing — 180 and 365 return the same
+figure. Worth keeping, but a third of the 69.9% predicted before it was
+measured; that estimate modelled evenly-spaced wear and the real pattern is
+dense streaks separated by long gaps.
+
+**Consequence: most days still cannot be scored.** 752 of 2,041 days score,
+1,289 refuse at 0% coverage. Of the scored days, 47% have no component
+available except sleep debt and ACWR — both penalties with no credit — so
+they can only report neutral-or-worse. See `comments-to-revisit.md`.
 
 **Samsung Health is historical only as of 15 Sep 2026 (plan D14).** The
 overnight sensor becomes a **Fitbit Air**, and sleep, resting HR, HRV and SpO2
