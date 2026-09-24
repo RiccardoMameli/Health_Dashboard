@@ -494,3 +494,39 @@ def test_workout_day_items_can_be_ticked_before_the_workout_syncs(client, auth):
     assert taken["Beta-alanine"] is False  # and the forgotten one is a miss
     # Now two more doses were expected today and one of them was taken.
     assert after["adherence_7d_pct"] == 87.5
+
+
+def test_brief_feedback_round_trips_through_the_today_screen(client, auth):
+    """The Yes/No buttons lit up and saved nothing. The route they now call
+    must store the rating where /today reads it back, so the card shows the
+    answer already given rather than inviting it twice."""
+    from datetime import UTC, datetime
+
+    from app.models import Brief
+
+    today = local_date(utcnow())
+    with session_scope() as s:
+        s.add(Brief(date=today, type="daily", generated_at=datetime.now(UTC),
+                    output={"status": "ok", "headline": "A headline."}))
+    brief_id = client.get("/api/v1/today", headers=auth).json()["brief"]["id"]
+
+    url = f"/api/v1/brief/{brief_id}/feedback"
+    assert client.post(url, params={"rating": "not_useful"}, headers=auth).status_code == 204
+    assert client.get("/api/v1/today", headers=auth).json()["brief"]["feedback_rating"] == (
+        "not_useful"
+    )
+
+    assert client.post(url, params={"rating": "meh"}, headers=auth).status_code == 422
+    assert client.post("/api/v1/brief/999/feedback", params={"rating": "useful"},
+                       headers=auth).status_code == 404
+
+
+def test_the_feedback_buttons_send_what_the_api_accepts(client):
+    """A typo in a data attribute fails silently as a 422 behind an
+    optimistic tick, so the values are pinned to the route's pattern."""
+    import re
+
+    body = client.get("/ui").text
+    assert sorted(re.findall(r'class="fb"[^>]*data-rating="(\w+)"', body)) == [
+        "not_useful", "useful"]
+    assert "/feedback?rating=" in body

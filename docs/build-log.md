@@ -6,6 +6,32 @@ of each working session.
 
 ---
 
+## 24 September 2026 (evening) — feedback that saves, and three layout fixes
+
+- **The brief's "Was this useful?" buttons saved nothing.** They lit up
+  through a leftover demo toggle and never called `POST /brief/{id}/feedback`,
+  which had existed all along. That rating is the ground-truth signal for
+  judging the brief (plan 9.4), so a control pretending to record it was
+  worse than none. Now stored, shown back from `/today` on reload, and undone
+  on screen if the save fails.
+- **The empty brief card** stretched to the readiness card's height: ~450px
+  of blank panel on desktop. With no brief it now sizes to its content.
+- **The muscle figure used the readiness band's colours** — red worked, amber
+  recovering, green ready — so beside an amber score an amber shoulder read
+  as a second warning. Time since a session is a fact, not a verdict: it now
+  uses one accent hue, strongest where the stimulus is freshest.
+- **Tile footers broke mid-phrase** in the four-across row ("Samsung /
+  Health" beside "20 nights over 30 / days"). Items stay whole and the second
+  drops to its own line when the pair does not fit.
+
+Seen while checking: with the 8h target, today's readiness on the review
+data went from 62 to 51 and Sleep trend from 2/7 to 0/7 — the same nights,
+now counted against a higher bar.
+
+238 tests passing.
+
+---
+
 ## 24 September 2026 (later) — an 8-hour target, and a supplements card that ticks
 
 ### Sleep target 7h30 → 8h

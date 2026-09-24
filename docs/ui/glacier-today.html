@@ -147,6 +147,10 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
   box-shadow:var(--shadow);
 }
 .card > .micro:first-child{display:block; margin-bottom:14px}
+/* With no brief the card holds a headline and perhaps a caveat. Stretched
+   to the readiness card's height beside it, that was ~450px of blank card on
+   desktop; sized to its content, the space is page rather than panel. */
+.brief.empty{align-self:start}
 .span-5{grid-column:span 5} .span-7{grid-column:span 7}
 .span-3{grid-column:span 3} .span-4{grid-column:span 4}
 .span-6{grid-column:span 6} .span-8{grid-column:span 8}
@@ -262,6 +266,8 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
 }
 .fb:hover{border-color:var(--hairline-2); color:var(--ink)}
 .fb[aria-pressed="true"]{background:var(--accent-soft); border-color:var(--accent); color:var(--accent)}
+.fb[aria-busy="true"]{opacity:.55; cursor:progress}
+.fbStatus{margin-left:4px}
 
 /* ── metric tiles ── */
 .tile{display:flex; flex-direction:column; gap:12px; min-height:184px}
@@ -271,6 +277,12 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
 .delta{font-family:var(--f-mono); font-size:11.5px; font-variant-numeric:tabular-nums}
 .delta.down{color:var(--crit)} .delta.up{color:var(--crit)} .delta.flat{color:var(--ink-2)} .delta.ok{color:var(--good)}
 .foot{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:auto}
+/* In the four-across row a tile is ~270px wide, and "Samsung Health" beside
+   "20 nights over 30 days" broke both mid-phrase into a ragged four-line
+   block. Each item now stays whole; when the pair does not fit, the second
+   drops to its own line. Tiles only: the check-in card's foot is prose. */
+.tile .foot{flex-wrap:wrap; row-gap:4px}
+.tile .foot > *{white-space:nowrap}
 .src{display:inline-flex; align-items:center; gap:6px; font-family:var(--f-mono); font-size:9.5px;
   letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3)}
 .src i{width:5px; height:5px; border-radius:50%; display:block}
@@ -399,10 +411,15 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
 .bodyFig svg{ width:100%; height:auto; max-height:148px; display:block; }
 .bodyFig figcaption{ margin-top:5px; color:var(--ink-3); }
 .mg{ fill:var(--surface-2); stroke:var(--hairline); stroke-width:.6; transition:fill .35s ease; }
-.mg.st-worked{ fill:var(--crit); stroke:var(--crit); }
-.mg.st-recovering{ fill:var(--warn); stroke:var(--warn); }
-.mg.st-likely_ready{ fill:var(--good); fill-opacity:.42; stroke:var(--good); }
-.mg.st-ready{ fill:var(--good); stroke:var(--good); }
+/* One hue, strongest where the stimulus is freshest. These were red, amber
+   and green — the readiness band's colours — so beside an amber score an
+   amber shoulder read as a second warning, and a green leg as "good". Time
+   since a session is a fact about the calendar, not a judgement, and gets
+   the accent scale rather than the traffic light. */
+.mg.st-worked{ fill:var(--accent); stroke:var(--accent); }
+.mg.st-recovering{ fill:var(--accent); fill-opacity:.58; stroke:var(--accent); }
+.mg.st-likely_ready{ fill:var(--accent); fill-opacity:.28; stroke:var(--accent); stroke-opacity:.6; }
+.mg.st-ready{ fill:var(--accent); fill-opacity:.1; stroke:var(--accent); stroke-opacity:.45; }
 .mg.st-unknown{ fill:none; stroke:var(--hairline-2); stroke-dasharray:2 2; }
 .inert{ fill:var(--surface-2); stroke:var(--hairline); stroke-width:.6; }
 .bodyLegend{ display:flex; flex-wrap:wrap; gap:4px 9px; margin-top:12px; justify-content:center; }
@@ -410,10 +427,10 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
   font-family:var(--f-mono); font-size:9px; letter-spacing:.03em;
   text-transform:uppercase; color:var(--ink-3); }
 .bodyLegend i{ width:8px; height:8px; border-radius:2.5px; border:1px solid var(--hairline); }
-.sw-worked{ background:var(--crit); border-color:var(--crit); }
-.sw-recovering{ background:var(--warn); border-color:var(--warn); }
-.sw-likely{ background:var(--good); opacity:.42; border-color:var(--good); }
-.sw-ready{ background:var(--good); border-color:var(--good); }
+.sw-worked{ background:var(--accent); border-color:var(--accent); }
+.sw-recovering{ background:color-mix(in srgb, var(--accent) 58%, transparent); border-color:var(--accent); }
+.sw-likely{ background:color-mix(in srgb, var(--accent) 28%, transparent); border-color:color-mix(in srgb, var(--accent) 60%, transparent); }
+.sw-ready{ background:color-mix(in srgb, var(--accent) 10%, transparent); border-color:color-mix(in srgb, var(--accent) 45%, transparent); }
 .sw-unknown{ background:none; border-style:dashed; }
 .bodyNote{
   margin:9px 0 0; color:var(--ink-3); line-height:1.5; text-align:center;
@@ -677,8 +694,9 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
 
       <div class="feedback" id="feedbackBlock">
         <span class="micro" style="margin-right:4px">Was this useful</span>
-        <button class="fb" type="button" aria-pressed="false">Yes</button>
-        <button class="fb" type="button" aria-pressed="false">No</button>
+        <button class="fb" type="button" aria-pressed="false" data-rating="useful">Yes</button>
+        <button class="fb" type="button" aria-pressed="false" data-rating="not_useful">No</button>
+        <span class="micro fbStatus" id="fbStatus" role="status"></span>
       </div>
     </section>
 
@@ -928,18 +946,6 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     store.set('glacier-theme', next);
   });
 
-  // toggles
-  Array.prototype.forEach.call(document.querySelectorAll('.fb, .tag'), function(b){
-    b.addEventListener('click', function(){
-      var on = b.getAttribute('aria-pressed') === 'true';
-      if (b.className === 'fb'){
-        Array.prototype.forEach.call(b.parentNode.querySelectorAll('.fb'), function(o){
-          o.setAttribute('aria-pressed','false');
-        });
-      }
-      b.setAttribute('aria-pressed', on ? 'false' : 'true');
-    });
-  });
 
   // Tooltip on the sleep bars. Delegated, because the bars are rebuilt
   // whenever the scenario changes and per-element listeners would be lost.
@@ -1104,11 +1110,14 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
        to render every section regardless: a "See brief" pill with filler
        text, an empty "Do today", and "Was this useful? Yes / No" under a
        brief that did not exist. */
+    $('db').closest('section').classList.toggle('empty', !s.hasBrief);
     show('whyBlock', s.why.length > 0);
     show('doTodayBlock', s.doToday.length > 0);
     show('verdictBlock', !!s.verdict);
     show('caveatBlock', !!s.caveat);
-    show('feedbackBlock', s.hasBrief);
+    show('feedbackBlock', s.hasBrief && !!s.briefId);
+    feedbackBriefId = s.briefId || null;
+    markFeedback(s.feedbackRating || null);
     set('verdictWord', s.verdict || '');
     set('verdictText', s.verdictText || '');
     set('caveatText', s.caveat);
@@ -1620,6 +1629,8 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
          message, and [] would silently render an empty panel instead. */
       contributors: contributorsOf(readiness),
       hasBrief: !!(d.brief && d.brief.headline),
+      briefId: d.brief ? d.brief.id : null,
+      feedbackRating: d.brief ? d.brief.feedback_rating : null,
       headline: d.brief && d.brief.headline
         ? d.brief.headline
         : 'No brief yet today.',
@@ -1864,6 +1875,41 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     suppPost('/api/v1/supplements/log/all' + (suppDay ? '?day=' + suppDay : ''))
       .then(renderSupplements)
       .catch(function(){ btn.disabled = false; set('suppAdh', 'Not saved — tap again'); });
+  });
+
+  /* Brief feedback. The buttons used to light up and save nothing — a
+     control that pretends is worse than none, because the rating is the
+     ground-truth signal for judging the brief (plan 9.4). Now each tap is
+     stored against this brief and undone on screen if the save fails. */
+  var feedbackBriefId = null;
+  function markFeedback(rating){
+    Array.prototype.forEach.call(document.querySelectorAll('.fb'), function(o){
+      o.setAttribute('aria-pressed', String(o.getAttribute('data-rating') === rating));
+    });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.fb'), function(b){
+    b.addEventListener('click', function(){
+      if (!feedbackBriefId || b.getAttribute('aria-busy') === 'true') return;
+      var rating = b.getAttribute('data-rating');
+      var pressed = document.querySelector('.fb[aria-pressed="true"]');
+      var previous = pressed ? pressed.getAttribute('data-rating') : null;
+      if (rating === previous) return;
+      markFeedback(rating);
+      b.setAttribute('aria-busy', 'true');
+      set('fbStatus', '');
+      fetch('/api/v1/brief/' + feedbackBriefId + '/feedback?rating=' + rating, {
+        method: 'POST', headers: {Authorization: 'Bearer ' + token()}
+      })
+        .then(function(r){
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          set('fbStatus', 'Saved');
+        })
+        .catch(function(){
+          markFeedback(previous);
+          set('fbStatus', 'Not saved — tap again');
+        })
+        .then(function(){ b.removeAttribute('aria-busy'); });
+    });
   });
 
   loadLive();   // the only view there is
