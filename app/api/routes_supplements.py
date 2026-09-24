@@ -17,7 +17,7 @@ from app.schemas.supplements import (
     SupplementOut,
 )
 from app.services.ingest import ensure_day
-from app.services.supplements import WORKOUT_ONLY_SCHEDULES, adherence_7d
+from app.services.supplements import adherence_7d, scheduled_on
 from app.services.timeutil import local_date, utcnow
 
 router = APIRouter(
@@ -44,9 +44,10 @@ def checklist(day: Date | None = None, session: Session = Depends(db)) -> Supple
             select(Supplement).where(Supplement.is_active.is_(True)).order_by(Supplement.name)
         ).scalars()
     )
-    scheduled = [
-        s for s in supplements if s.schedule not in WORKOUT_ONLY_SCHEDULES or workout_logged
-    ]
+    # The same rule the adherence figure uses, from the same function: two
+    # definitions of "scheduled" is how the checklist and the percentage
+    # beside it would come to disagree.
+    scheduled = scheduled_on(supplements, day, {day} if workout_logged else set())
 
     logs = {
         row.supplement_id: row

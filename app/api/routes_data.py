@@ -151,40 +151,37 @@ def today(session: Session = Depends(db)) -> dict:
     }
 
 
+#: Tables deliberately left out of the export. Only one, and for a reason:
+#: `oauth_tokens` holds live Withings (and later Google) refresh tokens, and an
+#: export is a file that gets emailed, uploaded to a model, handed to a GP.
+EXPORT_EXCLUDED = frozenset({"oauth_tokens"})
+
+
 @router.get("/export")
 def export_all(session: Session = Depends(db)) -> dict:
-    """Full JSON export (plan 13). You should be able to get everything out."""
-    from app.models import (
-        ActivityDaily,
-        HeartMetric,
-        NutritionDaily,
-        ProtocolChange,
-        SleepSession,
-        Supplement,
-        SupplementLog,
-    )
+    """Full JSON export (plan 13). You should be able to get everything out.
 
-    def dump(model: type) -> list[dict]:
-        rows = session.execute(select(model)).scalars()
-        return [
-            {
-                c.name: (v.isoformat() if hasattr(v, "isoformat") else v)
-                for c in model.__table__.columns
-                if (v := getattr(row, c.name)) is not None
-            }
-            for row in rows
-        ]
+    Every table except `EXPORT_EXCLUDED`, discovered from the schema rather than
+    listed by hand. It used to be an allow-list of ten tables, and every table
+    added after it was written quietly fell out of it — including
+    `workout_sets`, which is every set, rep and weight from Hevy and the bulk
+    of the training record. A deny-list fails the other way: a new table is
+    exported unless someone decides it should not be.
 
-    return {
-        "exported_at": utcnow().isoformat(),
-        "checkins": dump(Checkin),
-        "workouts": dump(Workout),
-        "body_measurements": dump(BodyMeasurement),
-        "sleep_sessions": dump(SleepSession),
-        "heart_metrics": dump(HeartMetric),
-        "activity_daily": dump(ActivityDaily),
-        "nutrition_daily": dump(NutritionDaily),
-        "supplements": dump(Supplement),
-        "supplement_log": dump(SupplementLog),
-        "protocol_changes": dump(ProtocolChange),
-    }
+    Nulls are kept. Dropping them made "not measured" indistinguishable from
+    "no such field", which is exactly the distinction this project exists to
+    preserve.
+    """
+    from app.models import Base
+
+    def plain(value):
+        return value.isoformat() if hasattr(value, "isoformat") else value
+
+    tables = {}
+    for table in Base.metadata.sorted_tables:
+        if table.name in EXPORT_EXCLUDED:
+            continue
+        rows = session.execute(select(table)).mappings()
+        tables[table.name] = [{k: plain(v) for k, v in row.items()} for row in rows]
+
+    return {"exported_at": utcnow().isoformat(), "excluded": sorted(EXPORT_EXCLUDED), **tables}

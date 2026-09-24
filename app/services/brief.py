@@ -40,13 +40,27 @@ def store(
     *,
     phase: str,
 ) -> Brief:
-    """Upsert the day's brief. Re-running the morning job is always safe."""
+    """Upsert the day's brief — one row per day however often it runs.
+
+    That makes a re-run safe for the *database*. It does not make it free: the
+    route decides whether to call this at all, because every call here follows
+    a paid model call.
+    """
     row = session.execute(
         select(Brief).where(Brief.date == day, Brief.type == BRIEF_TYPE_DAILY)
     ).scalar_one_or_none()
     if row is None:
         row = Brief(date=day, type=BRIEF_TYPE_DAILY)
         session.add(row)
+
+    # A regenerated brief is different text, so a rating given to the previous
+    # one no longer describes anything the reader saw. Plan 9.4 uses these
+    # ratings as ground truth for prompt evaluation; one attached to the
+    # wrong words is worse than none.
+    if row.output is not None:
+        row.feedback_rating = None
+        row.feedback_note = None
+        row.delivered_via = None
 
     row.model = generated.model
     row.prompt_version = generated.prompt_version
