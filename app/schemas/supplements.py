@@ -29,7 +29,10 @@ class SupplementChecklist(BaseModel):
     date: Date
     items: list[SupplementChecklistItem]
     workout_logged: bool
-    adherence_7d_pct: float | None  # None when nothing was scheduled
+    adherence_7d_pct: float | None  # None: nothing scheduled, or nothing ever logged
+    # Workout-only items while no workout is logged for the day. Tickable, but
+    # not yet expected: see the checklist route for why they are offered.
+    if_training: list[SupplementChecklistItem] = []
 
 
 class SupplementLogIn(BaseModel):

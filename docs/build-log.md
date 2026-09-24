@@ -6,6 +6,42 @@ of each working session.
 
 ---
 
+## 24 September 2026 (later) — an 8-hour target, and a supplements card that ticks
+
+### Sleep target 7h30 → 8h
+
+The owner's original ask was "nights hitting 8h"; 7h30 was a default that
+stuck. `SLEEP_TARGET_MIN` defaults to 480. Sleep debt and the Sleep trend tile
+both read this one value, so they move together. **A `.env` copied from the
+old example still sets 450 and wins over the default** — this container's did.
+
+The test suite now pins 450 in `conftest.py`, as it already pins the
+timezone: the engine tests assert the debt arithmetic against fixtures whose
+ordinary night is 450 minutes, not the owner's preference. One test checks
+the shipped default.
+
+### Supplements card
+
+Built on the existing checklist API: tap to tick, "All taken", a count and
+the 7-day adherence. Ticks are optimistic and undone if the save fails, and
+carry the checklist's date so a page left open past midnight files them under
+the right day. Three problems surfaced by using it:
+
+- **Workout-day items could never be ticked on the day.** They appeared only
+  once a workout was logged, and Hevy syncs at 05:45 UTC, so an evening
+  session arrived the next morning — at which point BCAA and beta-alanine
+  became "scheduled" and counted as missed. The checklist now returns them
+  as `if_training`, tickable, counting only once a workout for the day lands.
+- **Adherence read 14% on the first day of ticking**: the six untracked days
+  before it counted as everything missed. The window now starts at the first
+  logged day, and is None before anything has been logged.
+- **The brief was told the whole stack was missed, every morning**, for the
+  same reason. `missed_on` is empty before tracking began.
+
+236 tests passing.
+
+---
+
 ## 24 September 2026 — a full review: four backend bugs, and a screen that ignored its data
 
 Asked for a review of everything built so far. Every bug below was shown to
