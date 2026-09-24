@@ -9,10 +9,10 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import db, require_token
 from app.config import get_settings
-from app.models import BodyMeasurement, Checkin, Workout
+from app.models import ActivityDaily, BodyMeasurement, Checkin, HeartMetric, Workout
 from app.schemas.common import BodyMeasurementOut, WorkoutOut
 from app.services import brief as brief_service
-from app.services.metrics_engine import compute_day
+from app.services.metrics_engine import _nights, compute_day
 from app.services.timeutil import local_date, utcnow
 
 router = APIRouter(tags=["data"], dependencies=[Depends(require_token)])
@@ -50,6 +50,17 @@ def list_body(days: int = 90, session: Session = Depends(db)) -> list[BodyMeasur
     )
 
 
+#: Days drawn in the Today screen's sleep and resting-HR tiles.
+TILE_DAYS = 7
+
+
+def _latest_source(rows) -> str | None:
+    """Where the most recent of these rows came from, so a tile names its
+    real source rather than one written into the markup."""
+    latest = max(rows, key=lambda r: r.date, default=None)
+    return latest.source if latest is not None else None
+
+
 @router.get("/today")
 def today(session: Session = Depends(db)) -> dict:
     """The Today screen payload (plan 10.1).
@@ -65,6 +76,33 @@ def today(session: Session = Depends(db)) -> dict:
     last_workout = session.execute(
         select(Workout).order_by(Workout.start_at.desc()).limit(1)
     ).scalar_one_or_none()
+
+    # A week of the two nightly tiles, oldest first, None where nothing was
+    # recorded. The screen used to receive none of this and drew every tile
+    # as "no data" whatever the database held — a placeholder from before
+    # there was any data, which outlived the data arriving. `_nights` is the
+    # engine's own definition of "the night" (the longest session on a date),
+    # used here so the tile and the score can never disagree about it.
+    week = [day - timedelta(days=offset) for offset in range(TILE_DAYS - 1, -1, -1)]
+    nights = _nights(session, week[0], day)
+    hearts = {
+        row.date: row
+        for row in session.execute(
+            select(HeartMetric).where(HeartMetric.date >= week[0], HeartMetric.date <= day)
+        ).scalars()
+    }
+
+    # Steps belong to the daytime, and at 07:00 today's count is a fraction of
+    # a day — so the tile shows the seven completed days ending yesterday.
+    step_days = [day - timedelta(days=offset) for offset in range(TILE_DAYS, 0, -1)]
+    activity = {
+        row.date: row
+        for row in session.execute(
+            select(ActivityDaily).where(
+                ActivityDaily.date >= step_days[0], ActivityDaily.date <= step_days[-1]
+            )
+        ).scalars()
+    }
 
     recent_weights = list(
         session.execute(
@@ -97,6 +135,14 @@ def today(session: Session = Depends(db)) -> dict:
             if last_workout
             else None
         ),
+        "activity": {
+            "last_7": [
+                {"date": d.isoformat(),
+                 "steps": activity[d].steps if d in activity else None}
+                for d in step_days
+            ],
+            "source": _latest_source(a for a in activity.values() if a.steps is not None),
+        },
         "weight": {
             # EWMA and its slope, from the metrics engine. Raw daily weight is
             # never shown as a trend (plan 6.2), and there is exactly one
@@ -105,6 +151,12 @@ def today(session: Session = Depends(db)) -> dict:
             "ewma_kg": computed.weight_ewma_kg,
             "trend_kg_per_week": computed.weight_trend_kg_per_week,
             "observations": len(recent_weights),
+            # The smoothed series the engine computed, not the raw weigh-ins.
+            "ewma_series": [
+                {"date": d.isoformat(), "kg": round(kg, 2)}
+                for d, kg in computed.weight_ewma_series
+            ],
+            "source": recent_weights[0].source if recent_weights else None,
         },
         "subjective_30d": [
             {"date": c.date.isoformat(), "overall": c.overall_1_10} for c in subjective
@@ -124,11 +176,29 @@ def today(session: Session = Depends(db)) -> dict:
                 computed.sleep_baseline.span_days if computed.sleep_baseline else None
             ),
             "debt_14d_min": computed.sleep_debt_14d_min,
+            "last_7": [
+                {"date": d.isoformat(),
+                 "duration_min": nights[d].duration_min if d in nights else None}
+                for d in week
+            ],
+            "source": _latest_source(nights.values()),
+            # For the Sleep trend tile: the target the debt is measured
+            # against (one setting, so the tile and the score agree), the
+            # median bedtime, and how much the sleep midpoint wanders.
+            "target_min": get_settings().sleep_target_min,
+            "typical_bedtime_min": computed.typical_bedtime_min,
+            "midpoint_variance_min": computed.sleep_midpoint_variance_min,
         },
         "resting_hr": {
             "value": computed.resting_hr,
             "baseline": computed.rhr_baseline.median if computed.rhr_baseline else None,
             "deviation_bpm": computed.rhr_deviation_bpm,
+            "last_7": [
+                {"date": d.isoformat(),
+                 "bpm": hearts[d].resting_hr if d in hearts else None}
+                for d in week
+            ],
+            "source": _latest_source(h for h in hearts.values() if h.resting_hr is not None),
         },
         "training": {
             "acwr": computed.acwr,
@@ -142,7 +212,16 @@ def today(session: Session = Depends(db)) -> dict:
             {
                 "id": brief_row.id,
                 "status": (brief_row.output or {}).get("status"),
+                # The fields the Today card renders. It used to receive only
+                # the headline, so "why" and "do today" were always empty and
+                # the card filled the space with placeholder text.
                 "headline": (brief_row.output or {}).get("headline"),
+                "why": (brief_row.output or {}).get("why") or [],
+                "do_today": (brief_row.output or {}).get("do_today") or [],
+                "training_recommendation": (brief_row.output or {}).get(
+                    "training_recommendation"
+                ),
+                "data_caveats": (brief_row.output or {}).get("data_caveats") or [],
                 "feedback_rating": brief_row.feedback_rating,
             }
             if brief_row is not None

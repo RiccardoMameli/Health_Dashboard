@@ -131,6 +131,33 @@ def sleep_midpoint_variance(
     return _stdev(observed)
 
 
+def typical_bedtime_minutes(
+    bedtimes_min: Sequence[float | None],
+    *,
+    min_observations: int = MIN_MIDPOINT_OBSERVATIONS,
+) -> float | None:
+    """Median bedtime, as minutes past local midnight (0 to 1440).
+
+    Bedtimes straddle midnight, so they are unwrapped before the median is
+    taken: anything before noon is treated as late the previous evening. On
+    a plain clock 23:30 and 00:30 average to midday; unwrapped they average
+    to midnight, which is the answer. The result is wrapped back onto a clock.
+
+    None below `min_observations` — a "typical" bedtime from three nights is
+    a coincidence, not a habit.
+    """
+    unwrapped = sorted(
+        b + 24 * 60 if b < 12 * 60 else b for b in bedtimes_min if b is not None
+    )
+    if len(unwrapped) < min_observations:
+        return None
+    n = len(unwrapped)
+    median = (
+        unwrapped[n // 2] if n % 2 else (unwrapped[n // 2 - 1] + unwrapped[n // 2]) / 2
+    )
+    return median % (24 * 60)
+
+
 def session_load_and_basis(
     *,
     duration_min: float | None,
