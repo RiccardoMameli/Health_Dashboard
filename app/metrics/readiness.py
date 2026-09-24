@@ -398,7 +398,7 @@ def compute_readiness(
         note = (
             f"Nothing adverse showing in {_phrase(present)} — but that is "
             f"{coverage:.0f}% of the picture, and none of it can tell you a "
-            f"morning went *well*, only that it did not go badly."
+            f"morning went well, only that it did not go badly."
         )
     elif missing:
         note = (

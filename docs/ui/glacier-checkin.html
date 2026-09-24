@@ -14,8 +14,8 @@
 
    The whole design brief is speed.  A check-in that is a chore
    does not get filled in, and a check-in that does not get
-   filled in is worth nothing at all — it is the one field that
-   carries readiness over its completeness floor.  So: the only
+   filled in is worth nothing at all — it is the one reading that
+   is available every morning, watch or no watch.  So: the only
    required answer is one tap, the save button never scrolls out
    of reach, and everything else is visibly optional.
    ───────────────────────────────────────────────────────────── */
@@ -194,6 +194,12 @@ a.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
 }
 .clear:hover{color:var(--ink-2)}
 
+.carried{
+  margin:-6px 0 12px; padding:8px 11px; border-radius:var(--r-sm);
+  background:var(--accent-soft); color:var(--ink-2); font-size:12.5px;
+}
+.carried b{color:var(--ink); font-weight:600}
+
 /* ── tags ── */
 .tags{display:flex; flex-wrap:wrap; gap:7px}
 .tag{
@@ -285,7 +291,7 @@ textarea::placeholder{color:var(--ink-3)}
       <span id="dayLabel">Today</span>
     </button>
     <span class="pill" id="streak" hidden>Streak <b id="streakN">0</b></span>
-    <a class="pill" href="/ui">Today screen</a>
+    <a class="pill" href="/ui" aria-label="Back to the dashboard">&larr; Dashboard</a>
   </div>
 
   <div class="banner" id="banner" role="status" aria-live="polite"><span id="bannerText"></span></div>
@@ -304,6 +310,7 @@ textarea::placeholder{color:var(--ink-3)}
     <span class="micro">Optional detail</span>
     <h2 class="ask" style="font-size:16px">Anything you want to add?</h2>
     <p class="hint">Skip freely — a partial check-in beats none, and blanks stay blank rather than becoming zeros.</p>
+    <p class="carried" id="carried" hidden>Carried over from your check-in on <b id="carriedDate"></b> — change anything that's different today.</p>
     <div class="scales" id="scales"></div>
   </section>
 
@@ -374,8 +381,25 @@ textarea::placeholder{color:var(--ink-3)}
     return t;
   }
 
+  /* "Today" is the server's today, in Europe/London, because that is the
+     calendar every day in the system is kept on. It used to be the phone's
+     clock, and the two disagree whenever the phone is somewhere else: at
+     07:00 in Tokyo it is 23:00 the previous evening in London, so a morning
+     check-in carried tomorrow's date and the server refused it as a future
+     date — every morning of a trip east, at exactly the time the form is
+     used. /status reports the server's date; until it has answered, the
+     phone's clock stands in. */
+  var serverToday = null;
+
   function localDate(offset){
-    var d = new Date();
+    var d;
+    if (serverToday) {
+      var p = serverToday.split('-');
+      // Noon, so no daylight-saving shift can move it across a date boundary.
+      d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]), 12);
+    } else {
+      d = new Date();
+    }
     d.setDate(d.getDate() - offset);
     return d;
   }
@@ -518,29 +542,56 @@ textarea::placeholder{color:var(--ink-3)}
   });
 
   // ── load: streak, and today's answers if there are any ───────────────
-  function applyPrefill(p){
+  /* `p` is either today's own check-in (editing it) or the most recent one
+     from an earlier day — /status falls back to that deliberately, because
+     plan 7.3 asks for the form to be pre-filled from yesterday.
+
+     Those two cases must not be treated alike. Editing restores everything.
+     A fresh morning restores only the seven scales, which describe states
+     that carry over from day to day and are what the pre-fill is for:
+       - never the overall score. It is the one required answer, and with
+         yesterday's pre-selected the save button is live on arrival, so one
+         tap records yesterday's rating as today's without the question ever
+         being asked. A check-in nobody answered is fabricated data.
+       - never the tags. They are events — alcohol, a late meal, a hangover —
+         and an event carried forward by inaction did not happen today.
+       - never the note, which is about the day it was written. */
+  function applyPrefill(p, isToday){
     state.overall = null; state.scales = {}; state.tags = {};
     Array.prototype.forEach.call(row.children, function(b){ b.setAttribute('aria-checked','false'); });
     Array.prototype.forEach.call(el('tags').children, function(b){ b.setAttribute('aria-pressed','false'); });
     el('note').value = '';
+    el('carried').hidden = true;
 
     if (p) {
-      if (p.overall_1_10) {
-        state.overall = p.overall_1_10;
-        row.children[p.overall_1_10 - 1].setAttribute('aria-checked','true');
-      }
       SCALES.forEach(function(s){
         if (p[s[0]] != null) state.scales[s[0]] = p[s[0]];
       });
-      (p.tags || []).forEach(function(t){
-        state.tags[t] = true;
-        var b = el('tags').querySelector('[data-tag="' + t + '"]');
-        if (b) b.setAttribute('aria-pressed','true');
-      });
-      el('note').value = p.free_text || '';
+      if (isToday) {
+        if (p.overall_1_10) {
+          state.overall = p.overall_1_10;
+          row.children[p.overall_1_10 - 1].setAttribute('aria-checked','true');
+        }
+        (p.tags || []).forEach(function(t){
+          state.tags[t] = true;
+          var b = el('tags').querySelector('[data-tag="' + t + '"]');
+          if (b) b.setAttribute('aria-pressed','true');
+        });
+        el('note').value = p.free_text || '';
+      } else if (Object.keys(state.scales).length) {
+        el('carriedDate').textContent = ukIso(p.date);
+        el('carried').hidden = false;
+      }
     }
     SCALES.forEach(function(s){ paintScale(s[0]); });
     refresh();
+  }
+
+  /* "2026-09-23" -> "23-09-2026", without a Date round-trip that would
+     shift it across midnight in any timezone west of UTC. */
+  function ukIso(s){
+    var parts = String(s || '').split('-');
+    return parts.length === 3 ? parts[2] + '-' + parts[1] + '-' + parts[0] : s;
   }
 
   /* `quiet` is set by the save path. Without it the reload that follows a
@@ -553,14 +604,21 @@ textarea::placeholder{color:var(--ink-3)}
       .then(function(r){ return r.ok ? r.json() : null; })
       .then(function(s){
         if (!s) return;
+        if (s.date && s.date !== serverToday) {
+          serverToday = s.date;
+          paintDay();
+        }
         if (s.streak_days) {
           el('streak').hidden = false;
           el('streakN').textContent = s.streak_days;
         } else {
           el('streak').hidden = true;
         }
-        // /status describes today only, so its prefill is only today's.
-        applyPrefill(state.offset === 0 ? s.prefill : null);
+        // /status describes today. Its prefill is today's check-in when there
+        // is one and otherwise the most recent earlier one — see applyPrefill.
+        // A backfill for an earlier day starts clean: yesterday's scales are
+        // not a guess at the day before yesterday.
+        applyPrefill(state.offset === 0 ? s.prefill : null, !!s.submitted);
         if (!quiet && state.offset === 0 && s.submitted) {
           say('ok', 'Already checked in today. Changing anything and saving replaces it.');
         }
@@ -575,10 +633,12 @@ textarea::placeholder{color:var(--ink-3)}
     if (!t) return;
 
     var body = {
-      date: iso(localDate(state.offset)),
       overall_1_10: state.overall,
       tags: Object.keys(state.tags)
     };
+    // Today is left for the server to fill in from its own clock, so the two
+    // can never disagree about which day this is. Only a backfill names one.
+    if (state.offset > 0) body.date = iso(localDate(state.offset));
     SCALES.forEach(function(s){
       if (state.scales[s[0]] != null) body[s[0]] = state.scales[s[0]];
     });
@@ -600,8 +660,10 @@ textarea::placeholder{color:var(--ink-3)}
         }, function(){ throw new Error('HTTP ' + r.status); });
       })
       .then(function(){
-        say('ok', 'Saved. That is the completeness floor cleared for ' +
-                  uk(localDate(state.offset)) + '.');
+        // Plain. It used to claim "the completeness floor cleared", which
+        // stopped being how the score works when coverage replaced
+        // completeness as the gate on 14 Sep.
+        say('ok', 'Saved for ' + uk(localDate(state.offset)) + '.');
         window.scrollTo({top:0, behavior:'smooth'});
         load(true);
       })

@@ -346,3 +346,82 @@ def test_reading_a_brief_that_does_not_exist(session, client, auth):
 
 def test_endpoints_require_the_token(client):
     assert client.get(f"/api/v1/metrics/{date(2026, 9, 4).isoformat()}").status_code == 401
+
+
+# ── the morning job runs once ────────────────────────────────────────────
+
+
+def _stored_brief(session, *, delivered=None, rating=None):
+    from app.models import Brief
+    from app.services.ingest import ensure_day
+    from app.services.timeutil import local_date, utcnow
+
+    day = local_date(utcnow())
+    ensure_day(session, day)
+    row = Brief(date=day, type="daily", phase="baseline", model="m", prompt_version="v",
+                input_snapshot={}, output={"headline": "old"}, generated_at=utcnow(),
+                delivered_via=delivered, feedback_rating=rating)
+    session.add(row)
+    session.commit()
+    return row
+
+
+@pytest.fixture
+def counting(monkeypatch):
+    """Count paid model calls and emails instead of making them."""
+    import app.api.routes_brief as routes
+
+    calls = {"generate": 0, "send": 0}
+
+    def fake_generate(session, day, **_):
+        calls["generate"] += 1
+        return brief_service.get(session, day)
+
+    def fake_send(row):
+        calls["send"] += 1
+        return "msg-1"
+
+    monkeypatch.setattr(routes.brief_service, "generate_and_store", fake_generate)
+    monkeypatch.setattr(routes, "send_brief", fake_send)
+    return calls
+
+
+def test_a_rerun_of_the_morning_job_does_not_pay_or_email_twice(client, auth, session, counting):
+    """The cron gets re-run — the retry button, a manual dispatch. Each run
+    used to call the model again, overwrite the brief and send another email."""
+    _stored_brief(session, delivered="email")
+
+    body = client.post("/api/v1/brief?send=true", headers=auth).json()
+    assert counting == {"generate": 0, "send": 0}
+    assert body["reused"] is True
+    assert body["delivery"]["status"] == "already_sent"
+
+
+def test_a_stored_but_undelivered_brief_is_sent_without_regenerating(
+    client, auth, session, counting
+):
+    """If generation worked and delivery failed, the retry should only deliver."""
+    _stored_brief(session)
+    body = client.post("/api/v1/brief?send=true", headers=auth).json()
+    assert counting == {"generate": 0, "send": 1}
+    assert body["delivery"]["status"] == "sent"
+
+
+def test_force_regenerates_and_drops_feedback_about_the_old_text(session):
+    """A rating belongs to the words it rated. Regenerating replaces them."""
+    seed_history(session)
+    first = brief_service.generate_and_store(
+        session, TODAY, settings=Settings(anthropic_api_key="test"),
+        client=FakeClient(seeded_brief()),
+    )
+    brief_service.record_feedback(session, first.id, "useful")
+    first.delivered_via = "email"
+    session.commit()
+
+    again = brief_service.generate_and_store(
+        session, TODAY, settings=Settings(anthropic_api_key="test"),
+        client=FakeClient(seeded_brief()),
+    )
+    assert again.id == first.id
+    assert again.feedback_rating is None
+    assert again.delivered_via is None

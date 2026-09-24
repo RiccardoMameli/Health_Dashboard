@@ -29,7 +29,7 @@ class SupplementChecklist(BaseModel):
     date: Date
     items: list[SupplementChecklistItem]
     workout_logged: bool
-    adherence_7d_pct: float
+    adherence_7d_pct: float | None  # None when nothing was scheduled
 
 
 class SupplementLogIn(BaseModel):

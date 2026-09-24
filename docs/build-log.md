@@ -6,6 +6,61 @@ of each working session.
 
 ---
 
+## 24 September 2026 — a full review: four backend bugs, and a screen that ignored its data
+
+Asked for a review of everything built so far. Every bug below was shown to
+fail on the old code before it was fixed. 232 tests passing.
+
+### Backend (`03f28d1`)
+
+- **Overnight wear rate counted check-ins, not nights.** A check-in without a
+  `no_watch` tag counted as a worn night, so a watch in a drawer read 100%. It
+  now counts distinct sleep dates over seven days, and is None when no sleep
+  has ever been recorded.
+- **The export dropped 11 of 21 tables**, `workout_sets` among them — every
+  set, rep and weight. It was an allow-list that new tables fell out of. Now a
+  deny-list over the schema, excluding only `oauth_tokens`, and it keeps nulls.
+- **Supplement adherence reported 100% against a true 42.9%.** Every taken log
+  counted against the scheduled total, so creatine taken on rest days filled
+  in for missed doses. Only scheduled (day, supplement) pairs count now, and
+  an empty schedule is None rather than 0%.
+- **Re-running the brief paid for a second generation and sent a second
+  email.** It now reuses today's brief unless forced and never re-sends one
+  already delivered.
+
+### Today screen and check-in form (`5cc3941`)
+
+- **Sleep, resting HR and weight always said "no data".** The live mapping
+  was hard-coded to empty series from before any data existed. `/today` now
+  carries a week of each (gaps as null), the weight EWMA series, and each
+  tile's real source; weight had been labelled "Withings" over Samsung data.
+- **Steps and Sleep trend were greyed out as "Coming soon"** over 1,950 days
+  of steps. Both built. Sleep trend counts nights at or above the same target
+  sleep debt uses, shows typical bedtime (new `typical_bedtime_minutes`,
+  median across midnight) and midpoint SD, and draws unmeasured nights as
+  gaps rather than misses.
+- The RHR line was drawn straight across missing days — an interpolation.
+- The status glyph was "!" whatever the band.
+- The brief card rendered filler text and offered "Was this useful?" on a
+  brief that did not exist; it now renders the brief's real fields, escaped.
+- The supplements card showed a made-up stack with three items ticked and
+  struck through. Replaced with an empty state until the tick UI exists.
+- **The check-in form pre-selected yesterday's overall score** — one tap to
+  record a number nobody chose — and copied yesterday's tags and note. Only
+  the seven scales carry over now, under a banner saying so.
+- **Checking in from abroad could 400.** From Tokyo the phone's date is
+  London's tomorrow; the form now takes the date from the server.
+
+### Not done, deliberately
+
+Suggestions rather than fixes, handed to the owner: the import's hot loop
+(R1), `GET /metrics/{day}` writing to the database, the Hevy backfill ignoring
+`since`, Withings OAuth state held in memory, the empty brief card's size on
+desktop, amber shared between readiness and the muscle figure, and whether the
+sleep target should be 7h30 (config) or the 8h originally asked for.
+
+---
+
 ## 15 September 2026 (later still) — the cap moves to 180, and says how old it is
 
 Two measurements settled a decision that had been argued about twice, and both

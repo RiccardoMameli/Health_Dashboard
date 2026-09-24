@@ -52,6 +52,7 @@ from app.metrics.derived import (
     sleep_debt,
     sleep_midpoint_variance,
     subjective_signal_without_baseline,
+    typical_bedtime_minutes,
     weight_ewma_series,
     weight_trend_kg_per_week,
 )
@@ -72,7 +73,7 @@ from app.models import (
     WorkoutSet,
 )
 from app.services.supplements import adherence_7d, missed_on
-from app.services.timeutil import sleep_midpoint_minutes, utcnow
+from app.services.timeutil import sleep_midpoint_minutes, to_local, utcnow
 
 #: Minimum spread per metric, in that metric's own units. Without these a
 #: quiet fortnight produces a near-zero SD and every trivial difference reads
@@ -124,6 +125,11 @@ def _nights(session: Session, start: Date, end: Date) -> dict[Date, SleepSession
         if current is None or (row.duration_min or 0) > (current.duration_min or 0):
             best[row.date] = row
     return best
+
+
+def _minutes_past_local_midnight(instant) -> float:
+    local = to_local(instant)
+    return local.hour * 60 + local.minute
 
 
 def _by_date(session: Session, model, start: Date, end: Date) -> dict:
@@ -279,6 +285,8 @@ class ComputedDay:
     #: than from his median, because fewer than fourteen check-ins exist.
     subjective_anchored: bool = False
     sleep_midpoint_variance_min: float | None = None
+    #: Median local bedtime over the midpoint window, minutes past midnight.
+    typical_bedtime_min: float | None = None
 
     resting_hr: float | None = None
     rhr_baseline: Baseline | None = None
@@ -306,6 +314,10 @@ class ComputedDay:
     nutrition_completeness_pct: float | None = None
 
     weight_ewma_kg: float | None = None
+    #: The whole smoothed series behind `weight_ewma_kg`, oldest first. Kept so
+    #: the screen can draw the trend the engine computed instead of drawing raw
+    #: weigh-ins, which plan 6.2 rules out as a trend.
+    weight_ewma_series: list = field(default_factory=list)
     weight_trend_kg_per_week: float | None = None
 
     checkin: Checkin | None = None
@@ -383,6 +395,11 @@ def compute_day(session: Session, day: Date, settings: Settings | None = None) -
         if d not in excluded and d > day - timedelta(days=MIDPOINT_WINDOW_DAYS)
     ]
     out.sleep_midpoint_variance_min = sleep_midpoint_variance(midpoints)
+    out.typical_bedtime_min = typical_bedtime_minutes([
+        _minutes_past_local_midnight(n.start_at)
+        for d, n in nights.items()
+        if d not in excluded and d > day - timedelta(days=MIDPOINT_WINDOW_DAYS)
+    ])
 
     # ── cardiovascular ───────────────────────────────────────────────────
     heart_today = hearts.get(overnight)
@@ -442,6 +459,7 @@ def compute_day(session: Session, day: Date, settings: Settings | None = None) -
         ).scalars()
     ]
     ewma = weight_ewma_series(weights)
+    out.weight_ewma_series = ewma
     if ewma:
         out.weight_ewma_kg = ewma[-1][1]
         out.weight_trend_kg_per_week = weight_trend_kg_per_week(ewma)

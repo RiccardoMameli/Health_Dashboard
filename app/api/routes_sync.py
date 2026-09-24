@@ -13,7 +13,7 @@ from app.adapters.hevy import HevyAdapter
 from app.adapters.withings import WithingsAdapter
 from app.api.deps import db, require_token
 from app.config import get_settings
-from app.models import Checkin, Day, SyncRun
+from app.models import Checkin, Day, SleepSession, SyncRun
 from app.schemas.common import DataHealthOut, SourceHealth, SyncRunOut
 from app.services.ingest import sync_run
 from app.services.timeutil import local_date, utcnow
@@ -23,6 +23,10 @@ public = APIRouter(prefix="/withings", tags=["withings"])
 
 ADAPTERS = {"hevy": HevyAdapter, "withings": WithingsAdapter}
 STALE_AFTER_HOURS = 36
+
+#: The rolling window the wear rate is reported over — the same seven nights
+#: the wear-bias guard judges a baseline by (MIN_WEAR_NIGHTS_PER_7).
+WEAR_WINDOW_DAYS = 7
 
 
 @router.post("/{source}")
@@ -111,15 +115,29 @@ def data_health(session: Session = Depends(db)) -> DataHealthOut:
             )
         )
 
-    # Overnight wear rate (plan 6.1 wear-bias guard). Until Health Connect
-    # lands in Phase 3 the only signal is the check-in's `no_watch` tag, so
-    # this is derived from check-ins and will be replaced by sleep_sessions.
-    window_start = today - timedelta(days=6)
-    recent = list(session.execute(select(Checkin).where(Checkin.date >= window_start)).scalars())
+    # Overnight wear rate (plan 6.1 wear-bias guard): nights in the last seven
+    # that actually produced a sleep session, since a session is the only
+    # evidence a watch was worn.
+    #
+    # This used to be computed from check-ins — every check-in without a
+    # `no_watch` tag counted as a worn night — on the grounds that sleep data
+    # did not exist yet. That stopped being true with the Samsung import, and
+    # the proxy was wrong in the direction that matters: a morning check-in
+    # with the tag simply not tapped read as a worn night, so daily check-ins
+    # with the watch in a drawer would have reported 100% wear on the one
+    # screen whose job is to be honest about the data.
+    #
+    # None when no sleep has ever been recorded, so "no sleep source" is not
+    # reported as "never wears it".
+    window_start = today - timedelta(days=WEAR_WINDOW_DAYS - 1)
     wear_rate = None
-    if recent:
-        worn = sum(1 for c in recent if "no_watch" not in (c.tags or []))
-        wear_rate = round(worn / 7 * 100, 1)
+    if session.execute(select(SleepSession.id).limit(1)).first() is not None:
+        nights = session.execute(
+            select(func.count(func.distinct(SleepSession.date))).where(
+                SleepSession.date >= window_start, SleepSession.date <= today
+            )
+        ).scalar_one()
+        wear_rate = round(nights / WEAR_WINDOW_DAYS * 100, 1)
 
     completed_30d = session.execute(
         select(func.count(Checkin.date)).where(Checkin.date >= today - timedelta(days=29))

@@ -45,10 +45,10 @@ def today_screen() -> FileResponse:
 def checkin_form() -> FileResponse:
     """The morning check-in.
 
-    The subjective field this collects is the one that carries readiness over
-    its 60% completeness floor: Samsung supplies four of the seven expected
-    fields, which is 57.1%. Every other integration in the plan is worth less
-    to the score than one tap here, which is why the page is built for speed
-    before anything else.
+    The subjective reading is the one component available every morning,
+    watch or no watch, and the only one that needs no device at all. On a
+    morning the watch stayed on the bedside table it can be most of what the
+    score has to go on, which is why the page is built for speed before
+    anything else.
     """
     return _page(CHECKIN_FILE)

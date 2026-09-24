@@ -100,23 +100,44 @@ def brief_input(
 def generate(
     day: Date | None = None,
     send: bool = Query(default=False, description="Deliver by email after generating"),
+    force: bool = Query(
+        default=False, description="Regenerate even if today's brief already exists"
+    ),
     session: Session = Depends(db),
 ) -> dict:
-    """Generate (and optionally deliver) the day's brief."""
+    """Generate (and optionally deliver) the day's brief — once.
+
+    The morning cron calls this, and a cron gets re-run: the Actions retry
+    button, a manual dispatch after a failed sync, a schedule that fires
+    late. Each call used to make a fresh paid model call, overwrite the
+    stored brief and, with send=true, email it again — so a retry cost twice,
+    arrived twice, and left any feedback already given attached to text that
+    had been replaced.
+
+    Now an existing brief is returned rather than regenerated, and one that
+    was delivered is not delivered again. `force` regenerates deliberately.
+    """
     day = day or local_date(utcnow())
-    try:
-        row = brief_service.generate_and_store(session, day)
-    except BriefGenerationError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    row = None if force else brief_service.get(session, day)
+    reused = row is not None and row.output is not None
+    if not reused:
+        try:
+            row = brief_service.generate_and_store(session, day)
+        except BriefGenerationError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     payload = _serialise(row)
+    payload["reused"] = reused
     if send:
-        try:
-            payload["delivery"] = {"id": send_brief(row), "status": "sent"}
-            mark_delivered(session, row, "email")
-        except EmailDeliveryError as exc:
-            # The brief exists and is stored; only delivery failed. Say which.
-            payload["delivery"] = {"status": "failed", "error": str(exc)}
+        if row.delivered_via:
+            payload["delivery"] = {"status": "already_sent", "via": row.delivered_via}
+        else:
+            try:
+                payload["delivery"] = {"id": send_brief(row), "status": "sent"}
+                mark_delivered(session, row, "email")
+            except EmailDeliveryError as exc:
+                # The brief exists and is stored; only delivery failed. Say which.
+                payload["delivery"] = {"status": "failed", "error": str(exc)}
     return payload
 
 

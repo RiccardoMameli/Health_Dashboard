@@ -41,6 +41,7 @@ from app.metrics.derived import (
     session_load_and_basis,
     sleep_debt,
     sleep_midpoint_variance,
+    typical_bedtime_minutes,
     volume_progression_slope,
     weight_ewma_series,
     weight_trend_kg_per_week,
@@ -134,6 +135,25 @@ def test_sleep_midpoint_variance_needs_enough_nights():
     assert sleep_midpoint_variance([1500.0, 1500.0, 1500.0, 1500.0, 1560.0]) == pytest.approx(
         26.83, abs=0.01
     )
+
+
+def test_typical_bedtime_straddles_midnight():
+    # 23:30, 23:50, 00:10, 00:20, 00:40. A plain median of minutes past
+    # midnight is 40 (00:40) and a plain mean lands mid-afternoon; the right
+    # answer is 00:10.
+    bedtimes = [23 * 60 + 30, 23 * 60 + 50, 10, 20, 40]
+    assert typical_bedtime_minutes(bedtimes) == 10
+
+
+def test_typical_bedtime_ignores_gaps_and_needs_enough_nights():
+    assert typical_bedtime_minutes([23 * 60, None, 23 * 60, 23 * 60, 23 * 60]) is None
+    assert typical_bedtime_minutes([23 * 60] * 5) == 23 * 60
+
+
+def test_typical_bedtime_even_count_averages_the_middle_pair_across_midnight():
+    # Middle pair 23:50 and 00:10 → 00:00, not 12:00.
+    bedtimes = [23 * 60 + 30, 23 * 60 + 50, 10, 30, 23 * 60 + 40, 50]
+    assert typical_bedtime_minutes(bedtimes) == 0
 
 
 # ── training load ────────────────────────────────────────────────────────

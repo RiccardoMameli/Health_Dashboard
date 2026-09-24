@@ -348,6 +348,8 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
 .supp[aria-pressed="true"] .box{background:var(--accent); border-color:var(--accent); color:var(--on-accent)}
 .supp[aria-pressed="true"] .nm{color:var(--ink-2); text-decoration:line-through; text-decoration-color:var(--ink-3)}
 .supp .nm{flex:1}
+.suppEmpty{margin:12px 0 0; color:var(--ink-3); font-size:13px; line-height:1.5}
+.suppEmpty code{font-family:var(--f-mono); font-size:11px}
 .supp .dose{font-family:var(--f-mono); font-size:11px; color:var(--ink-3); font-variant-numeric:tabular-nums}
 .sched{
   font-family:var(--f-mono); font-size:9px; letter-spacing:.08em; text-transform:uppercase;
@@ -376,6 +378,9 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
    legend, because status colour never signals alone (§10.3). */
 .gaugeRow{ display:flex; gap:20px; align-items:center; flex-wrap:wrap; }
 .gaugeRow > .gauge{ flex:0 0 auto; }
+/* Once the figures wrap under the gauge, centre the gauge too. Left alone it
+   sat hard left above a centred figure, with dead space beside it. */
+@media (max-width:560px){ .gaugeRow{ justify-content:center; } }
 .bodyWrap{ flex:1 1 180px; min-width:160px; }
 .bodyRow{ display:flex; gap:12px; justify-content:center; }
 .bodyFig{ margin:0; flex:0 1 92px; text-align:center; }
@@ -424,8 +429,8 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
   background:var(--surface-2); border:1px solid var(--hairline);
 }
 .dot7.hit{ background:var(--accent); border-color:var(--accent); }
-.dot7.miss{ background:var(--surface-2); }
-.dot7.gap{ background:transparent; border-style:dashed; }
+.dot7.miss{ background:var(--hairline-2); border-color:var(--hairline-2); }
+.dot7.unmeasured{ background:transparent; border-style:dashed; }
 
 .microrow{ display:flex; justify-content:space-between; gap:10px; margin-top:8px; }
 .microrow b{ color:var(--ink); font-weight:600; }
@@ -612,6 +617,7 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
 
       <h2 id="briefHeadline">Sleep ran 88 minutes under baseline and resting heart rate is 6 bpm above it.</h2>
 
+      <div id="whyBlock">
       <ul class="why" id="whyList">
         <li>
           <span class="rule"></span>
@@ -629,8 +635,9 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
           <p class="ev">ACWR 1.27 · acute 2,140 · chronic 1,680</p>
         </li>
       </ul>
+      </div>
 
-      <div class="actions">
+      <div class="actions" id="doTodayBlock">
         <span class="micro">Do today</span>
         <div id="doToday">
         <div class="action">
@@ -646,19 +653,18 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
         </div>
       </div>
 
-      <div class="verdict">
+      <div class="verdict" id="verdictBlock">
         <span class="v" id="verdictWord">Train light</span>
         <span class="r" id="verdictText">Sleep is short and resting HR is elevated. Keep the session submaximal, or move Pull B to tomorrow.</span>
       </div>
 
-      <div class="caveat">
+      <div class="caveat" id="caveatBlock">
         <span class="bar" aria-hidden="true"></span>
         <span id="caveatText">Protein unavailable — MyFitnessPal does not sync macros. Nutrition is 45% complete for yesterday.</span>
       </div>
 
-      <div class="feedback">
+      <div class="feedback" id="feedbackBlock">
         <span class="micro" style="margin-right:4px">Was this useful</span>
-        <span class="soonTag" style="position:static">Coming soon</span>
         <button class="fb" type="button" aria-pressed="false">Yes</button>
         <button class="fb" type="button" aria-pressed="false">No</button>
       </div>
@@ -681,7 +687,7 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
         <text x="186" y="66" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9" id="weightLo">84.2</text>
       </svg>
       <div class="foot">
-        <span class="src s-withings"><i></i>Withings</span>
+        <span id="weightSrc" class="src s-withings"><i></i>Withings</span>
         <span class="micro">EWMA · 30 d</span>
       </div>
     </section>
@@ -711,8 +717,7 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
       </div>
     </section>
     <!-- ───────── sleep consistency ───────── -->
-    <section class="card tile span-4 soon" aria-labelledby="t5">
-      <span class="soonTag">Coming soon</span>
+    <section class="card tile span-4" aria-labelledby="t5">
       <div class="head">
         <span class="micro" id="t5">Sleep trend</span>
         <span class="delta flat" id="sleepTrendDelta">—</span>
@@ -727,7 +732,7 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
         <span class="micro">Varies <b id="sleepVariance">—</b></span>
       </div>
       <div class="foot">
-        <span class="src s-samsung"><i></i>Samsung Health</span>
+        <span id="sleepTrendSrc" class="src s-samsung"><i></i>Samsung Health</span>
         <span class="micro" id="sleepTargetLabel">target —</span>
       </div>
     </section>
@@ -755,7 +760,7 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
         <div class="bar last" style="height:71.3%" data-tip="Thu 4 Sep · 5h42m"></div>
       </div>
       <div class="foot">
-        <span class="src s-samsung"><i></i>Samsung Health</span>
+        <span id="sleepSrc" class="src s-samsung"><i></i>Samsung Health</span>
         <span class="micro" id="sleepBaselineAge">—</span>
       </div>
     </section>
@@ -770,22 +775,22 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
            aria-label="Resting heart rate over 7 days, rising from 51 to 58 bpm against a 50 to 54 baseline band">
         <rect id="rhrBand" x="0" y="32" width="220" height="13.3" fill="var(--accent-soft)"></rect>
         <line id="rhrMedian" x1="0" y1="38.7" x2="220" y2="38.7" stroke="var(--hairline-2)" stroke-width="1" stroke-dasharray="3 4"></line>
-        <polyline id="rhrLine" points="10,42 43,35.3 76,38.7 109,32 142,35.3 175,25.3 208,18.7"
-                  fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>
+        <g id="rhrPoints" fill="var(--accent)"></g>
+        <path id="rhrLine" d=""
+                  fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
         <circle id="rhrDot" cx="208" cy="18.7" r="4.5" fill="var(--accent)" stroke="var(--bg)" stroke-width="2"></circle>
         <text x="0" y="60" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9" id="rhrLo">51</text>
         <text x="196" y="60" fill="var(--ink-3)" font-family="JetBrains Mono, monospace" font-size="9" id="rhrHi">58</text>
       </svg>
       <div class="foot">
-        <span class="src s-samsung"><i></i>Samsung Health</span>
+        <span id="rhrSrc" class="src s-samsung"><i></i>Samsung Health</span>
         <span class="micro" id="rhrFoot">Median 52</span>
       </div>
     </section>
 
 
     <!-- ───────── steps ───────── -->
-    <section class="card tile span-3 soon" aria-labelledby="t6">
-      <span class="soonTag">Coming soon</span>
+    <section class="card tile span-3" aria-labelledby="t6">
       <div class="head">
         <span class="micro" id="t6">Steps</span>
         <span class="delta flat" id="stepsDelta">—</span>
@@ -799,7 +804,7 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
         <div class="bar missing" style="height:100%"></div>
       </div>
       <div class="foot">
-        <span class="src s-samsung"><i></i>Samsung Health</span>
+        <span id="stepsSrc" class="src s-samsung"><i></i>Samsung Health</span>
         <span class="micro">7 d average <b id="stepsAvg">—</b></span>
       </div>
     </section>
@@ -852,26 +857,20 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     <section class="card soon span-4" aria-labelledby="sp">
       <span class="soonTag">Coming soon</span>
       <span class="micro" id="sp">Supplements</span>
-      <div class="stack">
-        <button class="supp" type="button" aria-pressed="true"><span class="box" aria-hidden="true">✓</span><span class="nm">Fish oil</span><span class="dose">4 softgels</span></button>
-        <button class="supp" type="button" aria-pressed="true"><span class="box" aria-hidden="true">✓</span><span class="nm">Multivitamin</span><span class="dose">2 tablets</span></button>
-        <button class="supp" type="button" aria-pressed="true"><span class="box" aria-hidden="true">✓</span><span class="nm">Vitamin D3</span><span class="dose">4,000 IU</span></button>
-        <button class="supp" type="button" aria-pressed="false"><span class="box" aria-hidden="true">✓</span><span class="nm">Vitamin C</span><span class="dose">1,000 mg</span></button>
-        <button class="supp" type="button" aria-pressed="false"><span class="box" aria-hidden="true">✓</span><span class="nm">Creatine</span><span class="dose">6 g</span></button>
-        <button class="supp" type="button" aria-pressed="false"><span class="box" aria-hidden="true">✓</span><span class="nm">Beta-alanine</span><span class="sched">Pre-workout</span></button>
-        <button class="supp" type="button" aria-pressed="false"><span class="box" aria-hidden="true">✓</span><span class="nm">Magnesium complex</span><span class="sched">Bedtime</span></button>
-      </div>
+      <!-- The placeholder here was a made-up stack with three items ticked
+           and struck through, which read as a record of what was taken. -->
+      <p class="note suppEmpty">Today's checklist will appear here. The API behind it
+        (<code>/supplements/checklist</code>) exists; ticking from this card is not wired up yet.</p>
     </section>
 
     <!-- ───────── what the system cannot see ───────── -->
-    <section class="card soon span-4" aria-labelledby="dh">
-      <span class="soonTag">Coming soon</span>
+    <section class="card span-4" aria-labelledby="dh">
       <span class="micro" id="dh">Not measured</span>
       <div class="gaps">
         <div class="gap">
           <span class="micro">HRV</span>
           <span class="em">—</span>
-          <span class="note">Not exposed by this device. Readiness runs on the fallback formula.</span>
+          <span class="note">No source until the Fitbit Air (plan D14). Readiness is scored without it, at reduced confidence.</span>
         </div>
         <div class="gap">
           <span class="micro">Protein g/kg</span>
@@ -982,6 +981,10 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
   var STATUS_COLOUR = {green: 'var(--good)', amber: 'var(--warn)', red: 'var(--crit)', none: 'var(--ink-3)'};
 
   function pad2(n){ return String(n).padStart(2, '0'); }
+  function isoDaysAgo(n){
+    var d = new Date(); d.setDate(d.getDate() - n);
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
 
   /* DD-MM-YYYY on screen. The API keeps ISO because it sorts and parses
      unambiguously; only the reader's format changes. */
@@ -999,6 +1002,12 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
 
   function $(id){ return document.getElementById(id); }
   function set(id, text){ var el = $(id); if (el) el.textContent = text; }
+  function show(id, on){ var el = $(id); if (el) el.hidden = !on; }
+
+  var VERDICTS = {
+    train_hard: 'Train hard', train_light: 'Train light',
+    active_recovery: 'Active recovery', rest: 'Rest'
+  };
 
   function minutesLabel(mins){
     return Math.floor(mins / 60) + 'h' + String(mins % 60).padStart(2, '0') + 'm';
@@ -1050,19 +1059,38 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     }).join('');
   }
 
+  /* Everything below is model output. It is built into markup, so it is
+     escaped first: a brief quoting a workout titled "Push <heavy>" would
+     otherwise break the page, and one that happened to contain a tag would
+     be executing text the model wrote. */
+  function esc(v){
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
   function renderBrief(s){
     set('briefHeadline', s.headline);
     $('whyList').innerHTML = s.why.map(function(w){
-      return '<li><span class="rule"></span><p>' + w.obs +
-             '<span class="conf">' + w.conf + '</span></p>' +
-             '<p class="ev">' + w.ev + '</p></li>';
+      return '<li><span class="rule"></span><p>' + esc(w.obs) +
+             '<span class="conf">' + esc(w.conf) + '</span></p>' +
+             '<p class="ev">' + esc(w.ev) + '</p></li>';
     }).join('');
     $('doToday').innerHTML = s.doToday.map(function(a, i){
-      return '<div class="action"><span class="idx">' + (i + 1) + '</span><span>' + a.action +
-             '<span class="rat">' + a.rationale + '</span></span></div>';
+      return '<div class="action"><span class="idx">' + (i + 1) + '</span><span>' +
+             esc(a.action) + '<span class="rat">' + esc(a.rationale) + '</span></span></div>';
     }).join('');
-    set('verdictWord', s.verdict);
-    set('verdictText', s.verdictText);
+    /* Each part shows only when it has something real to say. The card used
+       to render every section regardless: a "See brief" pill with filler
+       text, an empty "Do today", and "Was this useful? Yes / No" under a
+       brief that did not exist. */
+    show('whyBlock', s.why.length > 0);
+    show('doTodayBlock', s.doToday.length > 0);
+    show('verdictBlock', !!s.verdict);
+    show('caveatBlock', !!s.caveat);
+    show('feedbackBlock', s.hasBrief);
+    set('verdictWord', s.verdict || '');
+    set('verdictText', s.verdictText || '');
     set('caveatText', s.caveat);
   }
 
@@ -1115,6 +1143,82 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
           : '—');
   }
 
+  /* Steps: the seven completed days ending yesterday. It sat under "Coming
+     soon" on the grounds that steps needed Phase 3, but the Samsung import
+     brought in 1,950 days of them. Missing days are hatched, as on the sleep
+     tile, and the line is the week's own average rather than a target. */
+  var STEPS_SCALE = 16000;
+
+  /* Sleep trend: the same seven nights as the sleep tile, counted against
+     the target the sleep-debt figure uses, so the tile and the score cannot
+     disagree about what "enough" means. An unrecorded night is a dashed
+     gap and is not counted as a miss — silence is not a short night. */
+  function hm(min){
+    var m = Math.round(min);
+    return Math.floor(m / 60) + 'h' + String(m % 60).padStart(2, '0');
+  }
+  function clock(min){
+    var m = Math.round(min) % (24 * 60);
+    return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+  }
+  function renderSleepTrend(s){
+    var nights = s.sleep.nights || [];
+    var target = s.sleep.targetMin;
+    var dots = $('sleepTrendDots'); if (!dots) return;
+    var measured = 0, hits = 0;
+    Array.prototype.forEach.call(dots.querySelectorAll('.dot7'), function(el, i){
+      var v = nights[i];
+      if (v === null || v === undefined || !target) { el.className = 'dot7 unmeasured'; el.setAttribute('data-tip', 'not measured'); return; }
+      measured += 1;
+      var hit = v >= target;
+      if (hit) hits += 1;
+      el.className = 'dot7 ' + (hit ? 'hit' : 'miss');
+      el.setAttribute('data-tip', hm(v) + (hit ? ' · at or above target' : ' · below target'));
+    });
+    $('sleepTrendVal').innerHTML = (measured ? hits : '—') + '<small> / 7 nights</small>';
+    set('sleepTrendDelta', measured === 7 ? 'all measured' : measured + ' of 7 measured');
+    set('sleepBedtime', s.sleep.bedtimeMin === null || s.sleep.bedtimeMin === undefined
+      ? '—' : clock(s.sleep.bedtimeMin));
+    set('sleepVariance', s.sleep.midpointVarianceMin === null || s.sleep.midpointVarianceMin === undefined
+      ? '—' : '±' + Math.round(s.sleep.midpointVarianceMin) + ' min');
+    set('sleepTargetLabel', target ? 'target ' + hm(target) : 'target —');
+  }
+  function renderSteps(s){
+    var vals = s.steps.days;
+    var bars = $('stepbars'); if (!bars) return;
+    Array.prototype.slice.call(bars.querySelectorAll('.bar')).forEach(function(el){ el.remove(); });
+    var observed = vals.filter(function(v){ return v !== null; });
+    vals.forEach(function(v, i){
+      var bar = document.createElement('div');
+      if (v === null) {
+        bar.className = 'bar missing';
+        bar.style.height = '100%';
+        bar.setAttribute('data-tip', s.steps.labels[i] + ' · no data');
+      } else {
+        bar.className = 'bar' + (i === vals.length - 1 ? ' last' : '');
+        bar.style.height = Math.min(100, 100 * v / STEPS_SCALE).toFixed(1) + '%';
+        bar.setAttribute('data-tip', s.steps.labels[i] + ' · ' + v.toLocaleString());
+      }
+      bars.appendChild(bar);
+    });
+    var yesterday = vals[vals.length - 1];
+    $('stepsVal').textContent = yesterday === null ? '—' : yesterday.toLocaleString();
+    var avg = observed.length
+      ? Math.round(observed.reduce(function(a, b){ return a + b; }, 0) / observed.length)
+      : null;
+    set('stepsAvg', avg === null ? '—' : avg.toLocaleString());
+    var line = $('stepsBaseline');
+    if (avg === null) { line.style.display = 'none'; }
+    else {
+      line.style.display = '';
+      line.style.bottom = Math.min(100, 100 * avg / STEPS_SCALE).toFixed(1) + '%';
+      set('stepsBaselineLabel', 'avg ' + avg.toLocaleString());
+    }
+    var d = $('stepsDelta');
+    d.textContent = yesterday === null ? 'none yesterday' : 'yesterday';
+    d.className = 'delta flat';
+  }
+
   function renderRhr(s){
     var vals = s.rhr.series;
     var observed = vals.filter(function(v){ return v !== null && v !== undefined; });
@@ -1123,7 +1227,8 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
        empty list is Infinity, and the dot's cy lands on NaN, which the browser
        rejects outright. An absent series is drawn as absent. */
     if (!observed.length || s.rhr.median === null || s.rhr.median === undefined) {
-      $('rhrLine').setAttribute('points', '');
+      $('rhrLine').setAttribute('d', '');
+      var pts0 = $('rhrPoints'); if (pts0) pts0.innerHTML = '';
       ['rhrDot', 'rhrBand', 'rhrMedian'].forEach(function(id){
         var el = $(id); if (el) el.style.display = 'none';
       });
@@ -1141,10 +1246,36 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     var lo = Math.min.apply(null, observed.concat([s.rhr.median])) - 2;
     var hi = Math.max.apply(null, observed.concat([s.rhr.median])) + 2;
     var y = function(v){ return 52 - ((v - lo) / (hi - lo)) * 40; };
-    var pts = [];
-    vals.forEach(function(v, i){ if (v !== null) pts.push((10 + i * 33) + ',' + y(v).toFixed(1)); });
+    /* One run of line per stretch of consecutive measured days. A single
+       polyline through every measured point drew straight across the missing
+       ones — 56 on Monday to 50 on Thursday, as though Tuesday and Wednesday
+       had been measured on the way. Plan 10.3 draws gaps as gaps; the line
+       now stops at a missing day and a lone reading is left as its own dot. */
+    var runs = [], run = [];
+    vals.forEach(function(v, i){
+      if (v === null || v === undefined) { if (run.length) runs.push(run); run = []; return; }
+      run.push([10 + i * 33, y(v)]);
+    });
+    if (run.length) runs.push(run);
+    var d = runs.map(function(r){
+      return r.length === 1
+        // A zero-length segment with a round cap renders as a dot.
+        ? 'M' + r[0][0] + ',' + r[0][1].toFixed(1) + ' l0.01,0'
+        : 'M' + r.map(function(p){ return p[0] + ',' + p[1].toFixed(1); }).join(' L');
+    }).join(' ');
 
-    $('rhrLine').setAttribute('points', pts.join(' '));
+    $('rhrLine').setAttribute('d', d);
+    // Every reading gets a mark of its own, so one standing alone between two
+    // gaps is as visible as one inside a run.
+    var marks = $('rhrPoints');
+    if (marks) {
+      marks.innerHTML = '';
+      runs.forEach(function(r){ r.forEach(function(pt){
+        var c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        c.setAttribute('cx', pt[0]); c.setAttribute('cy', pt[1].toFixed(1)); c.setAttribute('r', 2.6);
+        marks.appendChild(c);
+      }); });
+    }
     var lastIndex = -1;
     vals.forEach(function(v, i){ if (v !== null) lastIndex = i; });
     var dot = $('rhrDot');
@@ -1167,6 +1298,7 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
   }
 
   function renderTraining(s){
+    set('t3', s.training.heading || 'Last session');
     set('trainTitle', s.training.title);
     set('trainDelta', s.training.rpe);
     set('trainVolume', s.training.volume);
@@ -1221,8 +1353,20 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     var delta = $('weightDelta');
     delta.textContent = s.weight.delta;
     delta.className = 'delta ' + s.weight.deltaClass;
-    set('weightHi', vals[0].toFixed(1));
-    set('weightLo', vals[vals.length - 1].toFixed(1));
+    /* Each label sits beside the point it describes. They were pinned to
+       the top-left and bottom-right corners, which is only right when the
+       trend falls — the design was drawn for a weight coming down. On a
+       rising trend each label ended up at the opposite end of the chart from
+       its own point. (The ids still say Hi and Lo; they mean first and last.) */
+    var firstY = y(vals[0]), lastY = y(vals[vals.length - 1]);
+    var place = function(id, value, py){
+      var el = $(id); if (!el) return;
+      el.textContent = value.toFixed(1);
+      // Above the line when there is room, below it when the point is high.
+      el.setAttribute('y', (py < 22 ? py + 13 : py - 6).toFixed(1));
+    };
+    place('weightHi', vals[0], firstY);
+    place('weightLo', vals[vals.length - 1], lastY);
   }
 
   /* ─────────────────────────────────────────────────────────────
@@ -1253,6 +1397,78 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     return t;
   }
 
+  /* ── turning /today into tile data ───────────────────────────────────
+     These replaced hard-coded empty series. Every tile used to be drawn as
+     "no data" whatever the database held — a placeholder written before
+     there was any data, which outlived the data arriving. */
+  function series(block, key){
+    var rows = (block && block.last_7) || [];
+    if (!rows.length) return EMPTY_WEEK;
+    return rows.map(function(r){
+      return r[key] === null || r[key] === undefined ? null : Math.round(Number(r[key]));
+    });
+  }
+  function last(vals){ return vals.length ? vals[vals.length - 1] : null; }
+
+  /* Today against the baseline, in the metric's own unit. A missing reading
+     says so rather than showing a zero change. */
+  function deltaOf(today, baseline, unit){
+    if (today === null || today === undefined) return 'none today';
+    if (baseline === null || baseline === undefined) return 'no baseline';
+    var diff = Math.round(today - baseline);
+    return (diff > 0 ? '+' : diff < 0 ? '−' : '±') + Math.abs(diff) + unit;
+  }
+  function classOf(today, baseline){
+    if (today === null || today === undefined || baseline === null || baseline === undefined)
+      return 'flat';
+    var diff = today - baseline;
+    return diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat';
+  }
+
+  /* The engine smooths over 120 days so the average has history to settle
+     on; the tile is labelled 30 days and draws only those. */
+  var WEIGHT_TILE_DAYS = 30;
+
+  function weightOf(w){
+    var pts = (w && w.ewma_series) || [];
+    if (pts.length) {
+      var end = new Date(pts[pts.length - 1].date + 'T12:00:00');
+      var cutoff = new Date(end.getTime() - WEIGHT_TILE_DAYS * 86400000);
+      pts = pts.filter(function(p){ return new Date(p.date + 'T12:00:00') >= cutoff; });
+    }
+    var vals = pts.map(function(p){ return p.kg; });
+    var trend = w && w.trend_kg_per_week;
+    return {
+      series: vals,
+      source: w && w.source,
+      // The slope needs five weigh-ins inside a fortnight; weekly weighing
+      // never gets there, and the tile says so instead of inventing one.
+      delta: trend === null || trend === undefined
+        ? (vals.length ? 'too few for a trend' : 'no data')
+        : (trend > 0 ? '+' : trend < 0 ? '−' : '±') + Math.abs(trend).toFixed(2) + ' kg/wk',
+      deltaClass: trend > 0 ? 'up' : trend < 0 ? 'down' : 'flat'
+    };
+  }
+
+  var SOURCES = {
+    samsung_health: ['Samsung Health', 's-samsung'],
+    google_health: ['Google Health', 's-samsung'],
+    withings: ['Withings', 's-withings'],
+    hevy: ['Hevy', 's-hevy'],
+    myfitnesspal: ['MyFitnessPal', 's-mfp']
+  };
+  /* A tile names where its numbers actually came from. The labels were
+     written into the markup, so weight said "Withings" while every weigh-in
+     in the database had come from Samsung. */
+  function labelSource(id, source){
+    var el = $(id); if (!el) return;
+    var known = SOURCES[source];
+    if (!known) { el.style.visibility = source ? '' : 'hidden'; return; }
+    el.style.visibility = '';
+    el.className = 'src ' + known[1];
+    el.innerHTML = '<i></i>' + known[0];
+  }
+
   function forgetToken(){
     try { window.localStorage.removeItem(TOKEN_KEY); } catch (e) {}
   }
@@ -1260,6 +1476,19 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
   function num(v, digits){
     return v === null || v === undefined ? null : Number(v).toFixed(digits || 0);
   }
+
+  /* The same words app/metrics/readiness.py uses in its note, so the list
+     and the sentence above it name things the same way. "Sleep debt 14d"
+     was the internal key with its underscores swapped for spaces. */
+  var FACTOR_NAMES = {
+    sleep_duration: 'sleep length',
+    sleep_efficiency: 'sleep efficiency',
+    rhr_deviation: 'resting heart rate',
+    hrv_deviation: 'HRV',
+    sleep_debt_14d: 'sleep debt',
+    acwr: 'training load',
+    subjective_yesterday: 'how you rated the day'
+  };
 
   function contributorsOf(readiness){
     if (!readiness) return null;
@@ -1269,10 +1498,10 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     rows = rows.filter(function(c){ return c && c.impact; });
     if (!rows.length) return null;
     return rows.slice(0, 4).map(function(c){
-      var label = String(c.factor || '').replace(/_/g, ' ');
+      var label = FACTOR_NAMES[c.factor] || String(c.factor || '').replace(/_/g, ' ');
       return {
         name: label.charAt(0).toUpperCase() + label.slice(1),
-        impact: (c.impact < 0 ? '\u2212' : '+') + Math.abs(c.impact),
+        impact: (c.impact < 0 ? '\u2212' : '+') + Math.abs(Math.round(c.impact * 10) / 10),
         width: Math.min(100, Math.abs(c.impact) * 4)
       };
     });
@@ -1331,7 +1560,7 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
 
     var caveats = [];
     if (training.load_quality_note) caveats.push(training.load_quality_note);
-    if (!d.checkin_submitted) caveats.push('No check-in submitted for today.');
+
 
     /* The score is a mean over the components that could be computed, so the
        coverage behind it decides what it is worth. It is shown next to the
@@ -1345,10 +1574,16 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
       completeness: (coverage === null
         ? num(d.data_completeness_pct, 0) + '% complete'
         : num(coverage, 0) + '% measured'),
-      score: scored ? d.readiness : null,
+      // Rounded for display: 58.4 claims a precision the unvalidated weights
+      // behind it do not have. The arc still draws the exact value.
+      score: scored ? Math.round(d.readiness) : null,
       status: scored ? status : 'none',
       statusWord: scored ? status.charAt(0).toUpperCase() + status.slice(1) : 'No score',
-      glyph: scored ? '!' : '—',
+      /* Plan 10.3: colour never travels alone — each status carries its word
+         and a glyph. That only works if the glyphs differ. It was "!" for
+         every scored day, so a green morning wore an alarm mark and the
+         glyph told a colour-blind reader nothing the word had not. */
+      glyph: {green: '\u2713', amber: '!', red: '\u00d7'}[status] || '\u2014',
       /* Coverage is carried by the header pill and spelled out in the lede.
          It was tried under the number too and overflowed the gauge, clipping
          "of 100 - 41% measured" to something that read as a second figure. */
@@ -1364,31 +1599,56 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
          keys off null to show the "not measured well enough to score"
          message, and [] would silently render an empty panel instead. */
       contributors: contributorsOf(readiness),
+      hasBrief: !!(d.brief && d.brief.headline),
       headline: d.brief && d.brief.headline
         ? d.brief.headline
-        : 'No brief generated for today.',
-      why: [],
-      doToday: [],
-      verdict: scored ? 'See brief' : 'No recommendation',
-      verdictText: scored
-        ? 'Readiness scored from live data.'
-        : 'Too little was measured to say anything about readiness or training.',
-      caveat: caveats.join(' '),
-      /* No series endpoint yet, so these render as gaps rather than as
-         invented history. They fill in when there is something to fill
-         them with. */
-      sleep: {nights: EMPTY_WEEK, baseline: (d.sleep && d.sleep.baseline_min) || null,
+        : 'No brief yet today.',
+      why: ((d.brief && d.brief.why) || []).map(function(w){
+        return {obs: w.observation, ev: w.evidence, conf: w.confidence};
+      }),
+      doToday: ((d.brief && d.brief.do_today) || []).map(function(a){
+        return {action: a.action, rationale: a.rationale};
+      }),
+      verdict: d.brief && d.brief.training_recommendation
+        ? VERDICTS[d.brief.training_recommendation.verdict] || d.brief.training_recommendation.verdict
+        : null,
+      verdictText: d.brief && d.brief.training_recommendation
+        ? d.brief.training_recommendation.rationale
+        : null,
+      caveat: ((d.brief && d.brief.data_caveats) || []).concat(caveats).join(' '),
+      /* A week of each, oldest first. Unrecorded nights arrive as null and
+         render as gaps rather than as invented history. */
+      sleep: {nights: series(d.sleep, 'duration_min'),
+              delta: deltaOf(last(series(d.sleep, 'duration_min')),
+                             d.sleep && d.sleep.baseline_min, ' min'),
+              deltaClass: classOf(last(series(d.sleep, 'duration_min')),
+                                  d.sleep && d.sleep.baseline_min),
+              source: d.sleep && d.sleep.source,
+              baseline: (d.sleep && d.sleep.baseline_min) || null,
               baselineNights: (d.sleep && d.sleep.baseline_nights) || null,
               baselineSpanDays: (d.sleep && d.sleep.baseline_span_days) || null,
-              delta: 'no data', deltaClass: 'flat'},
-      rhr: {series: EMPTY_WEEK, median: (d.resting_hr && d.resting_hr.baseline) || null,
-            delta: 'no data', deltaClass: 'flat'},
+              targetMin: (d.sleep && d.sleep.target_min) || null,
+              bedtimeMin: d.sleep ? d.sleep.typical_bedtime_min : null,
+              midpointVarianceMin: d.sleep ? d.sleep.midpoint_variance_min : null},
+      rhr: {series: series(d.resting_hr, 'bpm'),
+            median: (d.resting_hr && d.resting_hr.baseline) || null,
+            delta: deltaOf(last(series(d.resting_hr, 'bpm')),
+                           d.resting_hr && d.resting_hr.baseline, ' bpm'),
+            deltaClass: classOf(last(series(d.resting_hr, 'bpm')),
+                                d.resting_hr && d.resting_hr.baseline),
+            source: d.resting_hr && d.resting_hr.source},
       training: {
         /* Dated deliberately: /today reports today, but last_workout is the
            most recent session whenever it happened. An undated title on a
            screen headed with this morning's date reads as this morning's
            session. */
         title: w ? ((w.title || 'Untitled session') + ' · ' + ukDate(w.date)) : 'No session logged',
+        /* The tile was headed "Yesterday" whatever the date, so a session from
+           last week sat under "Yesterday" beside its own older date. */
+        heading: !w ? 'Last session'
+          : w.date === isoDaysAgo(1) ? 'Yesterday'
+          : w.date === isoDaysAgo(0) ? 'Today'
+          : 'Last session',
         rpe: '—',
         volume: w && w.volume_kg !== null && w.volume_kg !== undefined
           ? Number(w.volume_kg).toLocaleString() + ' kg'
@@ -1396,11 +1656,19 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
         acwr: training.acwr === null || training.acwr === undefined ? null : training.acwr,
         rest: training.days_since_rest === null || training.days_since_rest === undefined
           ? 'no data'
-          : training.days_since_rest + ' days since rest'
+          : training.days_since_rest + (training.days_since_rest === 1 ? ' day' : ' days') +
+            ' since rest'
       },
       muscleRecovery: (d.training && d.training.muscle_recovery) || [],
       muscleRecoveryStatus: (d.training && d.training.muscle_recovery_status) || 'unmapped',
-      weight: {series: [], delta: 'no data', deltaClass: 'flat'}
+      weight: weightOf(d.weight),
+      steps: {
+        days: series(d.activity, 'steps'),
+        labels: ((d.activity && d.activity.last_7) || []).map(function(r){
+          return r.date.slice(8, 10) + '-' + r.date.slice(5, 7);
+        }),
+        source: d.activity && d.activity.source
+      }
     };
   }
 
@@ -1436,6 +1704,11 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     renderRhr(s);
     renderTraining(s);
     renderWeight(s);
+    if (s.sleep) labelSource('sleepSrc', s.sleep.source);
+    if (s.rhr) labelSource('rhrSrc', s.rhr.source);
+    if (s.weight) labelSource('weightSrc', s.weight.source);
+    if (s.steps) { renderSteps(s); labelSource('stepsSrc', s.steps.source); }
+    if (s.sleep) { renderSleepTrend(s); labelSource('sleepTrendSrc', s.sleep.source); }
     renderBody(s);
     Array.prototype.forEach.call(document.querySelectorAll('.scenario'), function(b){
       b.setAttribute('aria-pressed', String(b.getAttribute('data-scenario') === key));
@@ -1463,7 +1736,10 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
 
         var tags = document.getElementById('ciTags');
         tags.innerHTML = '';
-        ((s.prefill && s.prefill.tags) || []).forEach(function(name){
+        // Only today's. When nothing is submitted /status hands back the most
+        // recent earlier check-in as a prefill, and rendering its tags here put
+        // yesterday's "late screen" under today's "Not yet".
+        ((done && s.prefill && s.prefill.tags) || []).forEach(function(name){
           var b = document.createElement('span');
           b.className = 'tag'; b.setAttribute('aria-pressed','true');
           b.textContent = name.replace(/_/g, ' ');

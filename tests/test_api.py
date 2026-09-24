@@ -2,6 +2,8 @@
 
 from datetime import timedelta
 
+import pytest
+
 from app.db import session_scope
 from app.seed.run import main as seed
 from app.services.timeutil import local_date, utcnow
@@ -174,20 +176,53 @@ def test_data_health_reports_unconfigured_sources_without_pretending(client, aut
     assert body["checkin_completion_rate_30d"] == 0.0
 
 
-def test_overnight_wear_rate_uses_the_no_watch_tag(client, auth):
+def _night(session, day):
+    """A sleep session ending on the morning of `day`."""
+    from datetime import UTC, datetime
+
+    from app.models import SleepSession
+    from app.services.ingest import ensure_day
+
+    ensure_day(session, day)
+    end = datetime(day.year, day.month, day.day, 6, 30, tzinfo=UTC)
+    session.add(SleepSession(
+        date=day, start_at=end - timedelta(hours=7), end_at=end, duration_min=420,
+        source="samsung_health", source_record_id=f"n-{day}",
+    ))
+
+
+def test_wear_rate_counts_nights_that_produced_sleep(client, auth, session):
     today = local_date(utcnow())
-    for offset, tags in enumerate([[], ["no_watch"], [], []]):
+    for offset in (0, 1, 3, 5):
+        _night(session, today - timedelta(days=offset))
+    _night(session, today - timedelta(days=9))   # outside the window
+    session.commit()
+
+    body = client.get("/api/v1/sync/health", headers=auth).json()
+    assert body["overnight_wear_rate_7d"] == pytest.approx(4 / 7 * 100, abs=0.1)
+
+
+def test_a_checkin_is_not_evidence_the_watch_was_worn(client, auth, session):
+    """The regression. Check-ins were counted as worn nights unless tagged
+    `no_watch`, so a week of check-ins with the watch in a drawer reported
+    100% wear. A check-in says how the morning felt, not what was measured."""
+    today = local_date(utcnow())
+    _night(session, today - timedelta(days=30))   # sleep exists, just not this week
+    session.commit()
+    for offset in range(7):
         client.post(
             "/api/v1/checkin",
-            json={
-                "overall_1_10": 6,
-                "date": (today - timedelta(days=min(offset, 3))).isoformat(),
-                "tags": tags,
-            },
+            json={"overall_1_10": 6, "date": (today - timedelta(days=min(offset, 3))).isoformat()},
             headers=auth,
         )
+
     body = client.get("/api/v1/sync/health", headers=auth).json()
-    assert body["overnight_wear_rate_7d"] is not None
+    assert body["overnight_wear_rate_7d"] == 0.0
+
+
+def test_no_sleep_source_is_not_reported_as_never_wearing_it(client, auth):
+    body = client.get("/api/v1/sync/health", headers=auth).json()
+    assert body["overnight_wear_rate_7d"] is None
 
 
 def test_today_screen_does_not_invent_a_readiness_score(client, auth):
@@ -205,6 +240,28 @@ def test_export_returns_every_table(client, auth):
     assert len(body["checkins"]) == 1
     assert len(body["supplements"]) == 8
     assert "sleep_sessions" in body
+
+
+def test_export_covers_the_whole_schema_except_secrets(client, auth):
+    """It was an allow-list of ten tables and eleven had fallen out of it,
+    including workout_sets — every set and rep from Hevy. Plan 13 says you can
+    get everything out; the only thing that stays in is the token table."""
+    from app.models import Base
+
+    body = client.get("/api/v1/export", headers=auth).json()
+    for name in Base.metadata.tables:
+        if name == "oauth_tokens":
+            assert name not in body, "refresh tokens must never leave in an export"
+        else:
+            assert name in body, f"{name} is missing from the export"
+    assert "workout_sets" in body and "raw_records" in body
+
+
+def test_export_keeps_nulls_rather_than_dropping_them(client, auth):
+    """A missing key and a null field say different things."""
+    client.post("/api/v1/checkin", json={"overall_1_10": 7}, headers=auth)
+    row = client.get("/api/v1/export", headers=auth).json()["checkins"][0]
+    assert "energy_1_5" in row and row["energy_1_5"] is None
 
 
 def test_unknown_sync_source_is_404(client, auth):
@@ -252,9 +309,15 @@ def test_ui_carries_no_example_data(client):
 def test_ui_marks_the_unbuilt_cards_rather_than_hiding_them(client):
     """Greyed and labelled, so the shape of what is coming stays visible while
     it is unmistakably not a measurement."""
+    import re
+
     body = client.get("/ui").text
-    assert body.count("Coming soon") >= 3
-    assert 'class="card soon' in body
+    unbuilt = set(re.findall(r'class="card[^"]*\bsoon\b[^"]*" aria-labelledby="(\w+)"', body))
+    # Exactly these: energy balance waits on a food source (O2), supplements
+    # on the tick UI. Equality rather than a count, because the reverse
+    # matters too — Steps and Sleep trend sat greyed out under "Coming soon"
+    # over 1,950 days of data.
+    assert unbuilt == {"t7", "sp"}
 
 
 def test_ui_route_is_not_cached(client):
@@ -348,3 +411,42 @@ def test_the_sleep_tile_shows_the_baselines_age(client):
     body = client.get("/ui").text
     assert 'id="sleepBaselineAge"' in body
     assert "baseline_nights" in body and "baseline_span_days" in body
+
+
+def test_today_carries_the_week_behind_each_tile(client, auth):
+    """The tiles used to receive no series at all and drew "no data" whatever
+    the database held. Each now gets seven days, oldest first, with a gap as
+    None — never a zero and never a skipped day, or the bars shift left and
+    last night lands on the wrong label."""
+    from datetime import UTC, datetime
+
+    from app.models import ActivityDaily, HeartMetric, SleepSession
+    from app.services.ingest import ensure_day
+
+    today = local_date(utcnow())
+    two_ago, yesterday = today - timedelta(days=2), today - timedelta(days=1)
+    with session_scope() as s:
+        for day in (two_ago, yesterday, today):
+            ensure_day(s, day)
+        end_at = datetime.combine(two_ago, datetime.min.time(), tzinfo=UTC) + timedelta(hours=6)
+        s.add(SleepSession(
+            date=two_ago, start_at=end_at - timedelta(minutes=420), end_at=end_at,
+            duration_min=420, source="samsung_health", source_record_id="n1"))
+        s.add(HeartMetric(date=two_ago, resting_hr=53.0, source="samsung_health"))
+        s.add(ActivityDaily(date=yesterday, steps=10047, source="samsung_health"))
+        s.add(ActivityDaily(date=today, steps=812, source="samsung_health"))
+
+    body = client.get("/api/v1/today", headers=auth).json()
+
+    sleep = [n["duration_min"] for n in body["sleep"]["last_7"]]
+    assert sleep == [None, None, None, None, 420, None, None]
+    assert body["sleep"]["last_7"][-1]["date"] == today.isoformat()
+    assert body["sleep"]["source"] == "samsung_health"
+    assert body["sleep"]["target_min"] > 0
+
+    assert [h["bpm"] for h in body["resting_hr"]["last_7"]][4] == 53.0
+
+    # Steps stop at yesterday: this morning's 812 is a fraction of a day.
+    steps = body["activity"]["last_7"]
+    assert steps[-1] == {"date": yesterday.isoformat(), "steps": 10047}
+    assert 812 not in [d["steps"] for d in steps]

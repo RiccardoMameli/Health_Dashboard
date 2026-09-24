@@ -7,7 +7,7 @@ question and get the same answer. Two definitions of adherence would drift.
 from datetime import date as Date
 from datetime import timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Supplement, SupplementLog, Workout
@@ -33,31 +33,46 @@ def scheduled_on(
     ]
 
 
-def adherence_7d(session: Session, day: Date) -> float:
-    """Taken / expected over the trailing week, as a percentage."""
+def adherence_7d(session: Session, day: Date) -> float | None:
+    """Scheduled doses taken over the trailing week, as a percentage.
+
+    None when nothing was scheduled. There is no adherence to report against
+    an empty schedule, and 0% says "took none of them", which is a different
+    and alarming claim.
+
+    Only logs that answer a *scheduled* dose count. This used to count every
+    taken log in the window against the scheduled total, so creatine logged on
+    rest days — scheduled post-workout, taken daily — or a supplement since
+    stopped would fill in for doses that were actually missed. Measured: a
+    stack taken on three of seven days reported 100%. The cap at 100% that
+    was there hid the overcount rather than preventing it.
+    """
     start = day - timedelta(days=6)
     active = list(
         session.execute(select(Supplement).where(Supplement.is_active.is_(True))).scalars()
     )
     if not active:
-        return 0.0
+        return None
 
     workout_days = _workout_days(session, start, day)
-    expected = sum(
-        len(scheduled_on(active, start + timedelta(days=offset), workout_days))
+    expected = {
+        (start + timedelta(days=offset), s.id)
         for offset in range(7)
-    )
-    if expected == 0:
-        return 0.0
+        for s in scheduled_on(active, start + timedelta(days=offset), workout_days)
+    }
+    if not expected:
+        return None
 
-    taken = session.execute(
-        select(func.count(SupplementLog.supplement_id)).where(
-            SupplementLog.date >= start,
-            SupplementLog.date <= day,
-            SupplementLog.taken.is_(True),
-        )
-    ).scalar_one()
-    return round(min(taken / expected, 1.0) * 100, 1)
+    taken = set(
+        session.execute(
+            select(SupplementLog.date, SupplementLog.supplement_id).where(
+                SupplementLog.date >= start,
+                SupplementLog.date <= day,
+                SupplementLog.taken.is_(True),
+            )
+        ).tuples()
+    )
+    return round(len(expected & taken) / len(expected) * 100, 1)
 
 
 def missed_on(session: Session, day: Date) -> list[str]:
