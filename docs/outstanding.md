@@ -102,7 +102,7 @@ The Today screen came first for that reason.
 |---|---|---|---|
 | D1 | **Check-in form** | 1 | **Now the binding constraint on the whole score.** Samsung supplies 4 of the 7 completeness fields, which is 57.1% against a 60% floor — 2.9 points short, so a fully-measured night still reads `insufficient_data`. One subjective field typed by hand crosses it. Deferred on 10 Sep for want of a screen and sleep data; both now exist, and C1 cannot start until it does |
 | D2 | ~~Minimal Today screen~~ | 1 | **Done 10 Sep 2026.** `GET /ui` serves the Glacier reference from the backend with a "Live — my data" view reading `/api/v1/today`. Half the screen is still hand-written placeholder markup — the check-in card, supplements, source timestamps and header date — and says so in live mode |
-| D3 | Wire the remaining live tiles | 1–2 | Check-in state, supplement adherence and source timestamps are still design markup. Needs D1 and a data-health call. Sleep and RHR sparklines need a short series on `/today`, which is pointless until there is sleep data (A2/A3) |
+| D3 | Wire the remaining live tiles | 1–2 | **Mostly done 24 Sep 2026.** Sleep, resting HR, weight, Steps and Sleep trend render live data with their real source; the check-in card is live. Left: the supplements card (backend `/supplements/checklist` exists, the tick UI does not), energy balance (blocked on O2), and last-sync times from `/sync/health` |
 | D4 | Eval set for the brief (§9.4) | 2 | ~15 hand-picked days including a no-watch day and a missing-macros day |
 
 ---
