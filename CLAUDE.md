@@ -36,7 +36,7 @@ The Samsung Health export parser (`app/adapters/samsung_export.py`,
 `scripts/import_samsung_export.py`) is **verified against the real export and
 imported** (11 Sep 2026): 461 sleep sessions, 1,950 days of steps, 63 weight
 readings and 159 nights of derived resting HR, spanning Feb 2021 to Sep 2026.
-236 tests passing.
+238 tests passing.
 
 It **proves whether the timestamps are local or UTC and refuses to write
 anything if the data cannot settle it.** The answer for the sleep file turned
