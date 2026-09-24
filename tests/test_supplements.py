@@ -11,7 +11,7 @@ import pytest
 
 from app.models import Supplement, SupplementLog, Workout
 from app.services.ingest import ensure_day
-from app.services.supplements import adherence_7d
+from app.services.supplements import adherence_7d, missed_on
 
 DAY = date(2026, 9, 24)
 
@@ -67,3 +67,37 @@ def test_a_workout_day_supplement_counts_on_workout_days(session):
     session.commit()
 
     assert adherence_7d(session, DAY) == pytest.approx(100.0)
+
+
+def test_days_before_tracking_began_are_not_missed_doses(session):
+    """The first morning of ticking used to read 14%: six untracked days
+    counted as six days of everything missed. Before the first log nothing
+    was being recorded, and an unrecorded dose is not a missed one."""
+    _week(session)
+    daily = Supplement(name="Vitamin D", schedule="daily", is_active=True)
+    session.add(daily)
+    session.flush()
+    assert adherence_7d(session, DAY) is None  # never logged: no claim at all
+
+    session.add(SupplementLog(date=DAY, supplement_id=daily.id, taken=True))
+    session.commit()
+    assert adherence_7d(session, DAY) == 100.0
+
+    # Once tracking has begun, an unticked day is a miss like any other.
+    assert adherence_7d(session, DAY + timedelta(days=1)) == 50.0
+
+
+def test_nothing_is_missed_before_tracking_began(session):
+    """The brief is told what was missed yesterday. With nothing ever logged
+    it was told the whole stack, every morning."""
+    _week(session)
+    daily = Supplement(name="Vitamin D", schedule="daily", is_active=True)
+    session.add(daily)
+    session.commit()
+    assert missed_on(session, DAY - timedelta(days=1)) == []
+
+    session.add(SupplementLog(date=DAY, supplement_id=daily.id, taken=True))
+    session.commit()
+    assert missed_on(session, DAY - timedelta(days=1)) == []  # still before it began
+    assert missed_on(session, DAY) == []                        # taken
+    assert missed_on(session, DAY + timedelta(days=1)) == ["Vitamin D"]

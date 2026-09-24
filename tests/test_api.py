@@ -313,11 +313,10 @@ def test_ui_marks_the_unbuilt_cards_rather_than_hiding_them(client):
 
     body = client.get("/ui").text
     unbuilt = set(re.findall(r'class="card[^"]*\bsoon\b[^"]*" aria-labelledby="(\w+)"', body))
-    # Exactly these: energy balance waits on a food source (O2), supplements
-    # on the tick UI. Equality rather than a count, because the reverse
-    # matters too — Steps and Sleep trend sat greyed out under "Coming soon"
-    # over 1,950 days of data.
-    assert unbuilt == {"t7", "sp"}
+    # Exactly this one: energy balance waits on a food source (O2). Equality
+    # rather than a count, because the reverse matters too — Steps and Sleep
+    # trend sat greyed out under "Coming soon" over 1,950 days of data.
+    assert unbuilt == {"t7"}
 
 
 def test_ui_route_is_not_cached(client):
@@ -450,3 +449,48 @@ def test_today_carries_the_week_behind_each_tile(client, auth):
     steps = body["activity"]["last_7"]
     assert steps[-1] == {"date": yesterday.isoformat(), "steps": 10047}
     assert 812 not in [d["steps"] for d in steps]
+
+
+def test_workout_day_items_can_be_ticked_before_the_workout_syncs(client, auth):
+    """Hevy syncs once, in the early morning, so tonight's session is not in
+    the database until tomorrow. Workout-day items used to be hidden until
+    then — untickable on the day they were taken, then counted as missed
+    once the workout arrived. They are offered separately meanwhile, and a
+    tick counts only once a workout is actually logged."""
+    from datetime import UTC, datetime
+
+    from app.models import Workout
+    from app.services.ingest import ensure_day
+
+    seed()
+    checklist = client.get("/api/v1/supplements/checklist", headers=auth).json()
+    offered = {i["supplement"]["name"]: i["supplement"]["id"] for i in checklist["if_training"]}
+    assert set(offered) == {"BCAA", "Beta-alanine"}
+
+    # Everything scheduled taken; BCAA ticked in advance, Beta-alanine forgotten.
+    client.post("/api/v1/supplements/log/all", headers=auth)
+    client.post("/api/v1/supplements/log", json={"supplement_id": offered["BCAA"]}, headers=auth)
+    before = client.get("/api/v1/supplements/checklist", headers=auth).json()
+    # Tracking began today, so today is the whole window: all six expected
+    # doses taken. The advance BCAA tick is on neither side — nothing expects
+    # it yet.
+    assert before["adherence_7d_pct"] == 100.0
+    assert next(i for i in before["if_training"] if i["supplement"]["name"] == "BCAA")["taken"]
+
+    # "log all" is for what is expected, not what might be.
+    beta = next(i for i in before["if_training"] if i["supplement"]["name"] == "Beta-alanine")
+    assert beta["taken"] is False
+
+    today = local_date(utcnow())
+    with session_scope() as s:
+        ensure_day(s, today)
+        s.add(Workout(date=today, start_at=datetime.now(UTC), type="strength",
+                      source="hevy", source_record_id="evening"))
+
+    after = client.get("/api/v1/supplements/checklist", headers=auth).json()
+    assert after["if_training"] == []
+    taken = {i["supplement"]["name"]: i["taken"] for i in after["items"]}
+    assert taken["BCAA"] is True           # the early tick now counts
+    assert taken["Beta-alanine"] is False  # and the forgotten one is a miss
+    # Now two more doses were expected today and one of them was taken.
+    assert after["adherence_7d_pct"] == 87.5

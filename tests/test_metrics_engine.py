@@ -371,3 +371,11 @@ def test_the_checkin_adds_a_component_the_wearables_cannot(session):
     assert with_checkin.readiness.status != STATUS_INSUFFICIENT
     assert with_checkin.subjective_anchored is True
     assert with_checkin.readiness.score < NEUTRAL_SCORE, "a 3/10 is not an ordinary day"
+
+
+def test_the_shipped_sleep_target_is_eight_hours():
+    """The owner's target (24 Sep 2026). The suite pins its own value in
+    conftest, so this is the only place the default itself is checked."""
+    from app.config import Settings
+
+    assert Settings.model_fields["sleep_target_min"].default == 480

@@ -25,14 +25,18 @@ readiness score have still only ever seen fixtures.
 
 `GET /ui` serves the Today screen against live data, with the per-muscle
 recovery figure (plan §14.1 F1).
-Every tile with data behind it is wired (24 Sep 2026 review); only energy
-balance (O2) and the supplements tick list remain placeholders.
+Every tile with data behind it is wired (24 Sep 2026 review), and the
+supplements card ticks for real; only energy balance (O2) is a placeholder.
+
+**The sleep target is 8h** (`SLEEP_TARGET_MIN=480`, changed from 7h30 on
+24 Sep 2026). A `.env` copied from the old example still says 450 and
+overrides the default — check it.
 
 The Samsung Health export parser (`app/adapters/samsung_export.py`,
 `scripts/import_samsung_export.py`) is **verified against the real export and
 imported** (11 Sep 2026): 461 sleep sessions, 1,950 days of steps, 63 weight
 readings and 159 nights of derived resting HR, spanning Feb 2021 to Sep 2026.
-232 tests passing.
+236 tests passing.
 
 It **proves whether the timestamps are local or UTC and refuses to write
 anything if the data cannot settle it.** The answer for the sleep file turned

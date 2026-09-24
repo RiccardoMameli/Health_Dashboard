@@ -474,7 +474,7 @@ Pure functions over the database. No LLM involvement. Every one unit-tested agai
 
 | Metric | Definition | Notes |
 |---|---|---|
-| **Sleep debt (14d)** | Σ(target − actual) over 14 days, floored at 0 per night | Target configurable, default 7h30 |
+| **Sleep debt (14d)** | Σ(target − actual) over 14 days, floored at 0 per night | Target configurable, default 8h (was 7h30 until 24 Sep 2026) |
 | **Sleep midpoint variance** | SD of sleep midpoint over 14 days | Circadian regularity — strong and underrated predictor |
 | **RHR deviation** | today − 30d median | > +5 bpm is meaningful |
 | **HRV deviation** | (today − 30d median) / 30d median | Only if HRV proves available (§3.3) |
@@ -564,6 +564,8 @@ readiness = 100
 ### 8.2 Daily adherence
 
 A checklist rendering only what is scheduled that day. Two taps: "all taken", or individual toggles. Produces streaks and, more usefully, gap detection.
+
+Workout-day items are offered separately ("if you train today") until a workout is logged, because Hevy syncs once each morning and an evening session is not known about until the next day. A tick there counts toward adherence only once a workout for that day arrives. Adherence and "missed" both start from the first day anything was logged: before it nothing was being recorded, and an unrecorded dose is not a missed one.
 
 ### 8.3 Protocol change log — the important half
 
@@ -1113,7 +1115,7 @@ than acted on.
 |---|---|---|---|
 | O1 | Expo one-codebase vs Next.js (§4.2) | Phase 1 | **Resolved 3 Sep 2026: Expo** |
 | O2 | MyFitnessPal: stay, switch, or Premium monthly import (§3.4) | Phase 3 | **Provisionally: stay on MFP, calories only. Revisit.** |
-| O3 | Sleep target for sleep-debt calculation | Phase 2 | **Resolved 3 Sep 2026: 7h30** |
+| O3 | Sleep target for sleep-debt calculation | Phase 2 | **Resolved 3 Sep 2026: 7h30. Changed 24 Sep 2026 to 8h** — the owner's original ask was nights hitting 8h |
 | O4 | Per-muscle-group recovery view (§14.1 F1) | Phase 4 | **Recorded 10 Sep 2026, not scheduled.** Muscle groups resolvable from Hevy templates today; steps/stairs need Phase 3; the per-muscle percentage needs check-in soreness and Phase 5 to be honest. |
 | O5 | The long record (§14.1 F2) | Phase 4 | **Recorded 14 Sep 2026, not scheduled.** Wanted by the owner as a history to interrogate and to share with a GP. Needs no new integration, device or elapsed time — it reads the 5½ years already imported — so it has a case for arriving earlier than its phase. |
 

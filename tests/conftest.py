@@ -14,6 +14,10 @@ os.environ["DATABASE_URL"] = f"sqlite+pysqlite:///{_tmpdir}/test.db"
 os.environ["TIMEZONE"] = "Europe/London"
 os.environ["API_TOKEN"] = "test-token"
 os.environ["ENVIRONMENT"] = "test"
+# The fixtures' "unremarkable" night is 450 minutes, exactly on this target,
+# so they carry no debt. Pinned so the engine tests assert the arithmetic,
+# not whatever target the owner currently prefers (the default is 480).
+os.environ["SLEEP_TARGET_MIN"] = "450"
 
 from fastapi.testclient import TestClient  # noqa: E402
 

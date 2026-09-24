@@ -7,7 +7,7 @@ question and get the same answer. Two definitions of adherence would drift.
 from datetime import date as Date
 from datetime import timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import Supplement, SupplementLog, Workout
@@ -24,6 +24,12 @@ def _workout_days(session: Session, start: Date, end: Date) -> set[Date]:
     )
 
 
+def _tracking_began(session: Session) -> Date | None:
+    """The first day any supplement was logged. Before it, nothing was being
+    recorded, so no dose before it can be called missed."""
+    return session.execute(select(func.min(SupplementLog.date))).scalar_one_or_none()
+
+
 def scheduled_on(
     supplements: list[Supplement], day: Date, workout_days: set[Date]
 ) -> list[Supplement]:
@@ -36,9 +42,9 @@ def scheduled_on(
 def adherence_7d(session: Session, day: Date) -> float | None:
     """Scheduled doses taken over the trailing week, as a percentage.
 
-    None when nothing was scheduled. There is no adherence to report against
-    an empty schedule, and 0% says "took none of them", which is a different
-    and alarming claim.
+    None when nothing was scheduled, or nothing has ever been logged. There is
+    no adherence to report against an empty schedule, and 0% says "took none
+    of them", which is a different and alarming claim.
 
     Only logs that answer a *scheduled* dose count. This used to count every
     taken log in the window against the scheduled total, so creatine logged on
@@ -46,8 +52,17 @@ def adherence_7d(session: Session, day: Date) -> float | None:
     stopped would fill in for doses that were actually missed. Measured: a
     stack taken on three of seven days reported 100%. The cap at 100% that
     was there hid the overcount rather than preventing it.
+
+    The window starts no earlier than the first day anything was logged.
+    Before then nothing was being recorded, and an unrecorded dose is not a
+    missed one — otherwise the first morning of ticking reads as 14%
+    adherence, a week of "missed" doses that were never tracked at all.
     """
-    start = day - timedelta(days=6)
+    first_log = _tracking_began(session)
+    if first_log is None or first_log > day:
+        return None
+    start = max(day - timedelta(days=6), first_log)
+    days = (day - start).days + 1
     active = list(
         session.execute(select(Supplement).where(Supplement.is_active.is_(True))).scalars()
     )
@@ -57,7 +72,7 @@ def adherence_7d(session: Session, day: Date) -> float | None:
     workout_days = _workout_days(session, start, day)
     expected = {
         (start + timedelta(days=offset), s.id)
-        for offset in range(7)
+        for offset in range(days)
         for s in scheduled_on(active, start + timedelta(days=offset), workout_days)
     }
     if not expected:
@@ -79,8 +94,13 @@ def missed_on(session: Session, day: Date) -> list[str]:
     """Names of supplements that were scheduled on a day and not logged.
 
     Only meaningful for a day that is over: an empty checklist this morning
-    means "not yet", not "missed".
+    means "not yet", not "missed". Empty, too, for any day before tracking
+    began — with nothing ever logged this handed the brief the whole stack
+    as missed, every morning.
     """
+    began = _tracking_began(session)
+    if began is None or began > day:
+        return []
     active = list(
         session.execute(
             select(Supplement).where(Supplement.is_active.is_(True)).order_by(Supplement.name)

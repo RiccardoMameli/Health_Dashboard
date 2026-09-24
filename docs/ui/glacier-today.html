@@ -348,8 +348,20 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
 .supp[aria-pressed="true"] .box{background:var(--accent); border-color:var(--accent); color:var(--on-accent)}
 .supp[aria-pressed="true"] .nm{color:var(--ink-2); text-decoration:line-through; text-decoration-color:var(--ink-3)}
 .supp .nm{flex:1}
-.suppEmpty{margin:12px 0 0; color:var(--ink-3); font-size:13px; line-height:1.5}
+.supps{display:flex; flex-direction:column; gap:10px}
+.supps [hidden]{display:none}
+.suppHead{display:flex; align-items:baseline; justify-content:space-between; gap:10px}
+.suppGroup{display:flex; flex-direction:column; gap:4px; margin-top:4px}
+.supp[aria-busy="true"]{opacity:.55; cursor:progress}
+.suppEmpty{margin:0; color:var(--ink-3); font-size:13px; line-height:1.5}
 .suppEmpty code{font-family:var(--f-mono); font-size:11px}
+.suppAll{
+  font-family:var(--f-body); font-size:13px; font-weight:600; color:var(--accent);
+  background:var(--accent-soft); border:1px solid transparent; border-radius:999px;
+  padding:7px 14px; cursor:pointer;
+}
+.suppAll:hover{border-color:var(--accent)}
+.suppAll:disabled{opacity:.55; cursor:progress}
 .supp .dose{font-family:var(--f-mono); font-size:11px; color:var(--ink-3); font-variant-numeric:tabular-nums}
 .sched{
   font-family:var(--f-mono); font-size:9px; letter-spacing:.08em; text-transform:uppercase;
@@ -854,13 +866,21 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
     </section>
 
     <!-- ───────── supplements ───────── -->
-    <section class="card soon span-4" aria-labelledby="sp">
-      <span class="soonTag">Coming soon</span>
-      <span class="micro" id="sp">Supplements</span>
-      <!-- The placeholder here was a made-up stack with three items ticked
-           and struck through, which read as a record of what was taken. -->
-      <p class="note suppEmpty">Today's checklist will appear here. The API behind it
-        (<code>/supplements/checklist</code>) exists; ticking from this card is not wired up yet.</p>
+    <section class="card supps span-4" aria-labelledby="sp">
+      <div class="suppHead">
+        <span class="micro" id="sp">Supplements</span>
+        <span class="micro" id="suppCount"></span>
+      </div>
+      <div class="stack" id="suppList" role="group" aria-label="Scheduled today"></div>
+      <div class="suppGroup" id="suppTrainWrap" hidden>
+        <span class="micro">If you train today</span>
+        <div class="stack" id="suppTrain" role="group" aria-label="If you train today"></div>
+      </div>
+      <p class="suppEmpty" id="suppEmpty">Loading…</p>
+      <div class="foot">
+        <span class="micro" id="suppAdh"></span>
+        <button class="suppAll" id="suppAll" type="button" hidden>All taken</button>
+      </div>
     </section>
 
     <!-- ───────── what the system cannot see ───────── -->
@@ -909,7 +929,7 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
   });
 
   // toggles
-  Array.prototype.forEach.call(document.querySelectorAll('.supp, .fb, .tag'), function(b){
+  Array.prototype.forEach.call(document.querySelectorAll('.fb, .tag'), function(b){
     b.addEventListener('click', function(){
       var on = b.getAttribute('aria-pressed') === 'true';
       if (b.className === 'fb'){
@@ -1754,7 +1774,100 @@ button.pill:hover{border-color:var(--hairline-2); color:var(--ink)}
       .catch(function(){ set('ciWhy', 'Could not read the check-in status.'); });
   }
 
+  /* ── supplements card ──────────────────────────────────────────────
+     Plan 8.2: only what is scheduled today, two taps for "all taken".
+     Every tick is sent with the checklist's own date, so a page left open
+     past midnight cannot file last night's magnesium under the new day. */
+  var SCHEDULE_LABELS = {bedtime:'Bedtime', pre:'Pre-workout', post:'Post-workout',
+                         workout_day:'Training day', morning:'Morning', evening:'Evening'};
+  var suppDay = null;
+
+  function doseOf(sup){
+    if (sup.dose_amount === null || sup.dose_amount === undefined) return '';
+    return Number(sup.dose_amount).toLocaleString('en-GB') + (sup.dose_unit ? ' ' + sup.dose_unit : '');
+  }
+
+  function suppButton(item){
+    var sup = item.supplement;
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'supp';
+    b.setAttribute('aria-pressed', String(!!item.taken));
+    var label = SCHEDULE_LABELS[sup.schedule];
+    b.innerHTML = '<span class="box" aria-hidden="true">✓</span>' +
+      '<span class="nm">' + esc(sup.name) + '</span>' +
+      (label ? '<span class="sched">' + esc(label) + '</span>' : '') +
+      '<span class="dose">' + esc(doseOf(sup)) + '</span>';
+    b.addEventListener('click', function(){ toggleSupp(b, sup.id); });
+    return b;
+  }
+
+  function suppPost(path, body){
+    return fetch(path, {
+      method: 'POST',
+      headers: {Authorization: 'Bearer ' + token(), 'Content-Type': 'application/json'},
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); });
+  }
+
+  function toggleSupp(b, id){
+    if (b.getAttribute('aria-busy') === 'true') return;
+    var next = b.getAttribute('aria-pressed') !== 'true';
+    // Optimistic: the tick shows at once, and is undone if the save fails.
+    b.setAttribute('aria-pressed', String(next));
+    b.setAttribute('aria-busy', 'true');
+    suppPost('/api/v1/supplements/log', {supplement_id: id, taken: next, date: suppDay})
+      .then(renderSupplements)
+      .catch(function(){
+        b.setAttribute('aria-pressed', String(!next));
+        b.removeAttribute('aria-busy');
+        set('suppAdh', 'Not saved — tap again');
+      });
+  }
+
+  function renderSupplements(){
+    var t = token();
+    if (!t) return;
+    return fetch('/api/v1/supplements/checklist', {headers:{Authorization:'Bearer ' + t}})
+      .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(c){
+        suppDay = c.date;
+        var items = c.items || [], extra = c.if_training || [];
+        var list = $('suppList'), train = $('suppTrain');
+        list.innerHTML = ''; train.innerHTML = '';
+        items.forEach(function(i){ list.appendChild(suppButton(i)); });
+        extra.forEach(function(i){ train.appendChild(suppButton(i)); });
+        $('suppTrainWrap').hidden = !extra.length;
+
+        var empty = $('suppEmpty');
+        empty.hidden = !!(items.length || extra.length);
+        empty.textContent = 'No active supplements. Load the stack with python -m app.seed.run.';
+
+        var taken = items.filter(function(i){ return i.taken; }).length;
+        set('suppCount', items.length ? taken + ' of ' + items.length : '');
+        $('suppAll').hidden = !items.length || taken === items.length;
+        $('suppAll').disabled = false;
+        /* None when nothing was scheduled all week: no adherence to report,
+           which is not the same claim as 0%. */
+        set('suppAdh', c.adherence_7d_pct === null || c.adherence_7d_pct === undefined
+          ? '7-day adherence —'
+          : '7-day adherence ' + Math.round(c.adherence_7d_pct) + '%');
+      })
+      .catch(function(){
+        $('suppEmpty').hidden = false;
+        set('suppEmpty', 'Could not read the supplement checklist.');
+      });
+  }
+
+  $('suppAll').addEventListener('click', function(){
+    var btn = this;
+    btn.disabled = true;
+    suppPost('/api/v1/supplements/log/all' + (suppDay ? '?day=' + suppDay : ''))
+      .then(renderSupplements)
+      .catch(function(){ btn.disabled = false; set('suppAdh', 'Not saved — tap again'); });
+  });
+
   loadLive();   // the only view there is
   renderCheckin();
+  renderSupplements();
 })();
 </script>

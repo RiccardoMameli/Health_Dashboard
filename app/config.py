@@ -51,8 +51,10 @@ class Settings(BaseSettings):
     # Ops
     healthchecks_ping_url: str | None = None
 
-    # Metrics config (plan 6.2 / O3: default sleep target 7h30)
-    sleep_target_min: int = 450
+    # Metrics config (plan 6.2 / O3). 8h, set by the owner 24 Sep 2026: the
+    # original ask was "nights hitting 8h" and 7h30 was a default that stuck.
+    # Sleep debt and the Sleep trend tile both measure against this one value.
+    sleep_target_min: int = 480
 
     # Until HRV is verified on a real device (plan 3.3) it is neither scored
     # nor counted against completeness — a known gap reported once is not a

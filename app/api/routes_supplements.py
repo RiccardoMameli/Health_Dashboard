@@ -54,20 +54,30 @@ def checklist(day: Date | None = None, session: Session = Depends(db)) -> Supple
         for row in session.execute(select(SupplementLog).where(SupplementLog.date == day)).scalars()
     }
 
-    items = [
-        SupplementChecklistItem(
+    def item(s: Supplement) -> SupplementChecklistItem:
+        return SupplementChecklistItem(
             supplement=SupplementOut.model_validate(s),
             taken=bool(logs.get(s.id) and logs[s.id].taken),
             taken_at=logs[s.id].taken_at if s.id in logs else None,
         )
-        for s in scheduled
-    ]
+
+    # Workout-day items are offered before the workout is known about. Hevy
+    # syncs once, early in the morning, so an evening session is not in the
+    # database until the next day — and without this the pre- and
+    # post-workout items could never be ticked on the day they were taken,
+    # then counted as missed once the workout synced. A tick here is stored
+    # like any other and only counts toward adherence if a workout is later
+    # logged for the day (`adherence_7d` counts scheduled pairs only), so
+    # ticking one on a rest day inflates nothing.
+    scheduled_ids = {s.id for s in scheduled}
+    if_training = [s for s in supplements if s.id not in scheduled_ids]
 
     return SupplementChecklist(
         date=day,
-        items=items,
+        items=[item(s) for s in scheduled],
         workout_logged=workout_logged,
         adherence_7d_pct=adherence_7d(session, day),
+        if_training=[item(s) for s in if_training],
     )
 
 
